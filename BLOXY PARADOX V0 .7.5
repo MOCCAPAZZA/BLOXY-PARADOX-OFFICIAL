@@ -1,0 +1,4893 @@
+-- [[ BLOXY PARADOX PROJECT BY @MOCCAPAZZA ON YOUTUBE ]] --
+
+----------------------------------------------------------------------------------------------------
+-- [[ BUTTONS FUNCTIONS INSERTION AREA FOR EASIER BUGFIXES ]] --
+----------------------------------------------------------------------------------------------------
+local MyScripts = {
+	Topbar_2023    = [[ loadstring(game:HttpGet("https://pastebin.com/raw/cAfVPB5S",true))() ]],
+	Topbar_2016_A  = [[ local Players = game:GetService("Players")
+
+local function makeCharacterShiny(character)
+    -- Loop through everything inside the character model
+    for _, object in ipairs(character:GetDescendants()) do
+        if object:IsA("BasePart") then
+            object.Material = Enum.Material.SmoothPlastic
+        end
+    end
+
+    -- Catch any parts (like accessories or clothing limbs) that load in a split second later
+    character.DescendantAdded:Connect(function(object)
+        if object:IsA("BasePart") then
+            object.Material = Enum.Material.SmoothPlastic
+        end
+    end)
+end
+
+-- Handle players who are already in the game
+for _, player in ipairs(Players:GetPlayers()) do
+    if player.Character then
+        makeCharacterShiny(player.Character)
+    end
+    player.CharacterAdded:Connect(makeCharacterShiny)
+end
+
+-- Handle players who join the server later
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(makeCharacterShiny)
+end)
+
+
+--2016 TOPBAR
+
+loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-BEST-2016-COREUI-WORKING-60721" ]], 
+	Topbar_2016_S  = [[ --CONTEXT: This script was taken from 2016 corescripts off of ROBLOX's github
+
+spawn(function()
+	local LoadingGui = game:WaitForChild("CoreGui"):WaitForChild("RobloxLoadingGui")
+	LoadingGui.Enabled = false
+	LoadingGui:Destroy()
+end)
+
+-- Creates the generic "ROBLOX" loading screen on startup
+-- Written by ArceusInator & Ben Tkacheff, 2014
+
+-- Constants
+local PLACEID = game.PlaceId
+
+local MPS = game:GetService('MarketplaceService')
+local UIS = game:GetService('UserInputService')
+local guiService = game:GetService("GuiService")
+local ContextActionService = game:GetService('ContextActionService')
+local RobloxGui = game:GetService("CoreGui"):WaitForChild("RobloxGui")
+
+local startTime = tick()
+
+local COLORS = {
+	BLACK = Color3.new(0, 0, 0),
+	BACKGROUND_COLOR = Color3.new(45/255, 45/255, 45/255),
+	WHITE = Color3.new(1, 1, 1),
+	ERROR = Color3.new(253/255,68/255,72/255)
+}
+
+local function getViewportSize()
+	while not game.Workspace.CurrentCamera do
+		game.Workspace.Changed:wait()
+	end
+
+	while game.Workspace.CurrentCamera.ViewportSize == Vector2.new(0,0) do
+		game.Workspace.CurrentCamera.Changed:wait()
+	end
+
+	return game.Workspace.CurrentCamera.ViewportSize
+end
+
+--
+-- Variables
+local GameAssetInfo -- loaded by InfoProvider:LoadAssets()
+local currScreenGui, renderSteppedConnection = nil, nil
+local destroyingBackground, destroyedLoadingGui, hasReplicatedFirstElements = false, false, false
+local backgroundImageTransparency = 0
+local isMobile = (UIS.TouchEnabled == true and UIS.MouseEnabled == false and getViewportSize().Y <= 500)
+local isTenFootInterface = guiService:IsTenFootInterface()
+local platform = UIS:GetPlatform()
+
+local function IsConvertMyPlaceNameInXboxAppEnabled()
+	if UIS:GetPlatform() == Enum.Platform.XBoxOne then
+		local success, flagValue = pcall(function() return settings():GetFFlag("ConvertMyPlaceNameInXboxApp") end)
+		return (success and flagValue == true)
+	end
+	return false
+end
+
+--
+-- Utility functions
+local create = function(className, defaultParent)
+	return function(propertyList)
+		local object = Instance.new(className)
+		local parent = nil
+
+		for index, value in next, propertyList do
+			if type(index) == 'string' then
+				if index == 'Parent' then
+					parent = value
+				else
+					object[index] = value
+				end
+			else
+				if type(value) == 'function' then
+					value(object)
+				elseif type(value) == 'userdata' then
+					value.Parent = object
+				end
+			end
+		end
+		
+		if parent then
+			object.Parent = parent
+		end
+
+		if object.Parent == nil then
+			object.Parent = defaultParent
+		end
+
+		return object
+	end
+end
+
+--
+-- Create objects
+
+local MainGui = {}
+local InfoProvider = {}
+
+
+function ExtractGeneratedUsername(gameName)
+	local tempUsername = string.match(gameName, "^([0-9a-fA-F]+)'s Place$")
+	if tempUsername and #tempUsername == 32 then
+		return tempUsername
+	end
+end
+
+-- Fix places that have been made with incorrect temporary usernames
+function GetFilteredGameName(gameName, creatorName)
+	if gameName and type(gameName) == 'string' then
+		local tempUsername = ExtractGeneratedUsername(gameName)
+		if tempUsername then
+			local newGameName = string.gsub(gameName, tempUsername, creatorName, 1)
+			if newGameName then
+				return newGameName
+			end
+		end
+	end
+	return gameName
+end
+
+
+function InfoProvider:GetGameName()
+	if GameAssetInfo ~= nil then
+		if IsConvertMyPlaceNameInXboxAppEnabled() then
+			return GetFilteredGameName(GameAssetInfo.Name, self:GetCreatorName())
+		else
+			return GameAssetInfo.Name
+		end
+	else
+		return ''
+	end
+end
+
+function InfoProvider:GetCreatorName()
+	if GameAssetInfo ~= nil then
+		return GameAssetInfo.Creator.Name
+	else
+		return ''
+	end
+end
+
+function InfoProvider:LoadAssets()
+	spawn(function()
+		if PLACEID <= 0 then
+			while game.PlaceId <= 0 do
+				wait()
+			end
+			PLACEID = game.PlaceId
+		end
+
+		-- load game asset info
+		coroutine.resume(coroutine.create(function()
+			local success, result = pcall(function()
+				GameAssetInfo = MPS:GetProductInfo(PLACEID)
+			end)
+			if not success then
+				print("LoadingScript->InfoProvider:LoadAssets:", result)
+			end
+		end))
+	end)
+end
+
+function MainGui:tileBackgroundTexture(frameToFill)
+	if not frameToFill then return end
+	frameToFill:ClearAllChildren()
+	if backgroundImageTransparency < 1 then
+		local backgroundTextureSize = Vector2.new(512, 512)
+		for i = 0, math.ceil(frameToFill.AbsoluteSize.X/backgroundTextureSize.X) do
+			for j = 0, math.ceil(frameToFill.AbsoluteSize.Y/backgroundTextureSize.Y) do
+				create 'ImageLabel' {
+					Name = 'BackgroundTextureImage',
+					BackgroundTransparency = 1,
+					ImageTransparency = backgroundImageTransparency,
+					Image = 'rbxasset://textures/loading/darkLoadingTexture.png',
+					Position = UDim2.new(0, i*backgroundTextureSize.X, 0, j*backgroundTextureSize.Y),
+					Size = UDim2.new(0, backgroundTextureSize.X, 0, backgroundTextureSize.Y),
+					ZIndex = 1,
+					Parent = frameToFill
+				}
+			end
+		end
+	end
+end
+
+-- create a cancel binding for console to be able to cancel anytime while loading
+local function createTenfootCancelGui()
+	local cancelLabel = create'ImageLabel'
+	{
+		Name = "CancelLabel";
+		Size = UDim2.new(0, 83, 0, 83);
+		Position = UDim2.new(1, -32 - 83, 0, 32);
+		BackgroundTransparency = 1;
+		Image = 'rbxasset://textures/ui/Shell/ButtonIcons/BButton.png';
+	}
+	local cancelText = create'TextLabel'
+	{
+		Name = "CancelText";
+		Size = UDim2.new(0, 0, 0, 0);
+		Position = UDim2.new(1, -131, 0, 64);
+		BackgroundTransparency = 1;
+		FontSize = Enum.FontSize.Size36;
+		TextXAlignment = Enum.TextXAlignment.Right;
+		TextColor3 = COLORS.WHITE;
+		Text = "Cancel";
+	}
+
+	-- bind cancel action
+	local platformService = nil
+	pcall(function()
+		platformService = game:GetService('PlatformService')
+	end)
+
+	if platformService then
+		if not game:GetService("ReplicatedFirst"):IsFinishedReplicating() then
+			local seenBButtonBegin = false
+			ContextActionService:BindCoreAction("CancelGameLoad",
+				function(actionName, inputState, inputObject)
+					if inputState == Enum.UserInputState.Begin then
+						seenBButtonBegin = true
+					elseif inputState == Enum.UserInputState.End and seenBButtonBegin then
+						cancelLabel:Destroy()
+						cancelText.Text = "Canceling..."
+						cancelText.Position = UDim2.new(1, -32, 0, 64)
+						ContextActionService:UnbindCoreAction('CancelGameLoad')
+						platformService:RequestGameShutdown()
+					end
+				end,
+				false,
+				Enum.KeyCode.ButtonB)
+		end
+	end
+
+	while cancelLabel.Parent == nil do
+		if currScreenGui then
+			local blackFrame = currScreenGui:FindFirstChild('BlackFrame')
+			if blackFrame then
+				cancelLabel.Parent = blackFrame
+				cancelText.Parent = blackFrame
+				break
+			end
+		end
+		wait()
+	end
+end
+
+--
+-- Declare member functions
+function MainGui:GenerateMain()
+	local screenGui = create 'ScreenGui' {
+		Name = 'Custom2016LoadingGui' -- Renamed to prevent automatic self-deletion loop
+	}
+
+	--
+	-- create descendant frames
+	local mainBackgroundContainer = create 'Frame' {
+		Name = 'BlackFrame',
+		BackgroundColor3 = COLORS.BACKGROUND_COLOR,
+		BackgroundTransparency = 0,
+		Size = UDim2.new(1, 0, 1, 36),
+		Position = UDim2.new(0, 0, 0, -36),
+		Active = true,
+		Parent = screenGui,
+	}
+
+		local closeButton =	create 'ImageButton' {
+			Name = 'CloseButton',
+			Image = 'rbxasset://textures/loading/cancelButton.png',
+			ImageTransparency = 1,
+			BackgroundTransparency = 1,
+			Position = UDim2.new(1, -37, 0, 5),
+			Size = UDim2.new(0, 32, 0, 32),
+			Active = false,
+			ZIndex = 10,
+			Parent = mainBackgroundContainer,
+		}
+
+		local graphicsFrame = create 'Frame' {
+			Name = 'GraphicsFrame',
+			BorderSizePixel = 0,
+			BackgroundTransparency = 1,
+			Position = UDim2.new(1, (isMobile == true and -75 or (isTenFootInterface and -245 or -225)), 1, (isMobile == true and -75 or (isTenFootInterface and -185 or -165))),
+			Size = UDim2.new(0, (isMobile == true and 70 or (isTenFootInterface and 140 or 120)), 0, (isMobile == true and 70 or (isTenFootInterface and 140 or 120))),
+			ZIndex = 2,
+			Parent = mainBackgroundContainer,
+		}
+
+			local loadingImage = create 'ImageLabel' {
+				Name = 'LoadingImage',
+				BackgroundTransparency = 1,
+				Image = 'rbxasset://textures/loading/loadingCircle.png',
+				Position = UDim2.new(0, 0, 0, 0),
+				Size = UDim2.new(1, 0, 1, 0),
+				ZIndex = 2,
+				Parent = graphicsFrame,
+			}
+
+			local loadingText = create 'TextLabel' {
+				Name = 'LoadingText',
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, (isMobile == true and -14 or -56), 1, 0),
+				Position = UDim2.new(0, (isMobile == true and 12 or 28), 0, 0),
+				Font = Enum.Font.SourceSans,
+				FontSize = (isMobile == true and Enum.FontSize.Size12 or Enum.FontSize.Size18),
+				TextWrapped = true,
+				TextColor3 = COLORS.WHITE,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Visible = not isTenFootInterface,
+				Text = "Loading...",
+				ZIndex = 2,
+				Parent = graphicsFrame,
+			}
+
+		local uiMessageFrame = create 'Frame' {
+			Name = 'UiMessageFrame',
+			BackgroundTransparency = 1,
+			Position = UDim2.new(0.25, 0, 1, -120),
+			Size = UDim2.new(0.5, 0, 0, 80),
+			ZIndex = 2,
+			Parent = mainBackgroundContainer,
+		}
+
+			local uiMessage = create 'TextLabel' {
+				Name = 'UiMessage',
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 1, 0),
+				Font = Enum.Font.SourceSansBold,
+				FontSize = Enum.FontSize.Size18,
+				TextWrapped = true,
+				TextColor3 = COLORS.WHITE,
+				Text = "",
+				ZIndex = 2,
+				Parent = uiMessageFrame,
+			}
+
+		local infoFrame = create 'Frame' {
+			Name = 'InfoFrame',
+			BackgroundTransparency = 1,
+			Position = UDim2.new(0, (isMobile == true and 20 or 100), 1, (isMobile == true and -120 or -150)),
+			Size = UDim2.new(0.4, 0, 0, 110),
+			ZIndex = 2,
+			Parent = mainBackgroundContainer,
+		}
+
+			local placeLabel = create 'TextLabel' {
+				Name = 'PlaceLabel',
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, 80),
+				Position = UDim2.new(0, 0, 0, 0),
+				Font = Enum.Font.SourceSans,
+				FontSize = (isTenFootInterface and Enum.FontSize.Size48 or Enum.FontSize.Size24),
+				TextWrapped = true,
+				TextScaled = true,
+				TextColor3 = COLORS.WHITE,
+				TextStrokeTransparency = 0,
+				Text = "",
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Bottom,
+				ZIndex = 2,
+				Parent = infoFrame,
+			}
+
+			if isTenFootInterface then
+				local byLabel = create'TextLabel' {
+					Name = "ByLabel",
+					BackgroundTransparency = 1,
+					Size = UDim2.new(0, 36, 0, 30),
+					Position = UDim2.new(0, 0, 0, 80),
+					Font = Enum.Font.SourceSans,
+					FontSize = Enum.FontSize.Size36,
+					TextScaled = true,
+					TextColor3 = COLORS.WHITE,
+					TextStrokeTransparency = 0,
+					Text = "By",
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Top,
+					ZIndex = 2,
+					Visible = false,
+					Parent = infoFrame,
+				}
+				local creatorIcon = create'ImageLabel' {
+					Name = "CreatorIcon",
+					BackgroundTransparency = 1,
+					Size = UDim2.new(0, 30, 0, 30),
+					Position = UDim2.new(0, 38, 0, 80),
+					ImageTransparency = 0,
+					Image = 'rbxasset://textures/ui/Shell/Icons/RobloxIcon32.png',
+					ZIndex = 2,
+					Visible = false,
+					Parent = infoFrame,
+				}
+			end
+
+			local creatorLabel = create 'TextLabel' {
+				Name = 'CreatorLabel',
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, 30),
+				Position = UDim2.new(0, isTenFootInterface and 72 or 0, 0, 80),
+				Font = Enum.Font.SourceSans,
+				FontSize = (isTenFootInterface and Enum.FontSize.Size36 or Enum.FontSize.Size18),
+				TextWrapped = true,
+				TextScaled = true,
+				TextColor3 = COLORS.WHITE,
+				TextStrokeTransparency = 0,
+				Text = "",
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Top,
+				ZIndex = 2,
+				Parent = infoFrame,
+			}
+
+		local backgroundTextureFrame = create 'Frame' {
+			Name = 'BackgroundTextureFrame',
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 1, 0),
+			Position = UDim2.new(0, 0, 0, 0),
+			ClipsDescendants = true,
+			ZIndex = 1,
+			BackgroundTransparency = 1,
+			Parent = mainBackgroundContainer,
+		}
+
+	local errorFrame = create 'Frame' {
+		Name = 'ErrorFrame',
+		BackgroundColor3 = COLORS.ERROR,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0.25,0,0,0),
+		Size = UDim2.new(0.5, 0, 0, 80),
+		ZIndex = 8,
+		Visible = false,
+		Parent = screenGui,
+	}
+
+		local errorText = create 'TextLabel' {
+			Name = "ErrorText",
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 1, 0),
+			Font = Enum.Font.SourceSansBold,
+			FontSize = Enum.FontSize.Size14,
+			TextWrapped = true,
+			TextColor3 = COLORS.WHITE,
+			Text = "",
+			ZIndex = 8,
+			Parent = errorFrame,
+		}
+
+	while not game:GetService("CoreGui") do
+		wait()
+	end
+	screenGui.Parent = game:GetService("CoreGui")
+	currScreenGui = screenGui
+end
+
+function round(num, idp)
+  local mult = 10^(idp or 0)
+  return math.floor(num * mult + 0.5) / mult
+end
+
+---------------------------------------------------------
+-- Main Script (show something now + setup connections)
+
+-- start loading assets asap
+InfoProvider:LoadAssets()
+MainGui:GenerateMain()
+if isTenFootInterface then
+	createTenfootCancelGui()
+end
+
+local lastRenderTime, lastDotUpdateTime, brickCountChange = nil, nil, nil
+local fadeCycleTime = 1.7
+local turnCycleTime = 2
+local lastAbsoluteSize = Vector2.new(0, 0)
+local loadingDots = "..."
+local dotChangeTime = .2
+local lastBrickCount = 0
+
+renderSteppedConnection = game:GetService("RunService").RenderStepped:connect(function()
+	if not currScreenGui then return end
+	if not currScreenGui:FindFirstChild("BlackFrame") then return end
+
+	if setVerb then
+		currScreenGui.BlackFrame.CloseButton:SetVerb("Exit")
+		setVerb = false
+	end
+
+	if currScreenGui.BlackFrame:FindFirstChild("BackgroundTextureFrame") and currScreenGui.BlackFrame.BackgroundTextureFrame.AbsoluteSize ~= lastAbsoluteSize then
+		lastAbsoluteSize = currScreenGui.BlackFrame.BackgroundTextureFrame.AbsoluteSize
+		MainGui:tileBackgroundTexture(currScreenGui.BlackFrame.BackgroundTextureFrame)
+	end
+
+	local infoFrame = currScreenGui.BlackFrame:FindFirstChild('InfoFrame')
+	if infoFrame then
+		-- set place name
+		local placeLabel = infoFrame:FindFirstChild('PlaceLabel')
+		if placeLabel and placeLabel.Text == "" then
+			placeLabel.Text = InfoProvider:GetGameName()
+		end
+
+		-- set creator name
+		local creatorLabel = infoFrame:FindFirstChild('CreatorLabel')
+		if creatorLabel and creatorLabel.Text == "" then
+			local creatorName = InfoProvider:GetCreatorName()
+			if creatorName ~= "" then
+				if isTenFootInterface then
+					local showDevName = true
+					if platform == Enum.Platform.XBoxOne then
+						local success, result = pcall(function()
+							return settings():GetFFlag("ShowDevNameInXboxApp")
+						end)
+						if success then
+							showDevName = result
+						end
+					end
+					creatorLabel.Text = showDevName and creatorName or ""
+					local creatorIcon = infoFrame:FindFirstChild('CreatorIcon')
+					local byLabel = infoFrame:FindFirstChild('ByLabel')
+					if creatorIcon then creatorIcon.Visible = showDevName end
+					if byLabel then byLabel.Visible = showDevName end
+				else
+					creatorLabel.Text = "By "..creatorName
+				end
+			end
+		end
+	end
+
+	if not lastRenderTime then
+		lastRenderTime = tick()
+		lastDotUpdateTime = lastRenderTime
+		return
+	end
+
+	local currentTime = tick()
+	local fadeAmount = (currentTime - lastRenderTime) * fadeCycleTime
+	local turnAmount = (currentTime - lastRenderTime) * (360/turnCycleTime)
+	lastRenderTime = currentTime
+
+	currScreenGui.BlackFrame.GraphicsFrame.LoadingImage.Rotation = currScreenGui.BlackFrame.GraphicsFrame.LoadingImage.Rotation + turnAmount
+
+	local updateLoadingDots =  function()
+		loadingDots = loadingDots.. "."
+		if loadingDots == "...." then
+			loadingDots = ""
+		end
+		currScreenGui.BlackFrame.GraphicsFrame.LoadingText.Text = "Loading" ..loadingDots
+	end
+
+	if currentTime - lastDotUpdateTime >= dotChangeTime and InfoProvider:GetCreatorName() == "" then
+		lastDotUpdateTime = currentTime
+		updateLoadingDots()
+	else
+		if guiService:GetBrickCount() > 0 then
+			if brickCountChange == nil then
+				brickCountChange = guiService:GetBrickCount()
+			end
+			if guiService:GetBrickCount() - lastBrickCount >= brickCountChange then
+				lastBrickCount = guiService:GetBrickCount()
+				updateLoadingDots()
+			end
+		end
+	end
+
+	if not isTenFootInterface then
+		if currentTime - startTime > 5 and currScreenGui.BlackFrame.CloseButton.ImageTransparency > 0 then
+			currScreenGui.BlackFrame.CloseButton.ImageTransparency = currScreenGui.BlackFrame.CloseButton.ImageTransparency - fadeAmount
+
+			if currScreenGui.BlackFrame.CloseButton.ImageTransparency <= 0 then
+				currScreenGui.BlackFrame.CloseButton.Active = true
+			end
+		end
+	end
+end)
+
+spawn(function()
+	local RobloxGui = game:GetService("CoreGui"):WaitForChild("RobloxGui")
+	local guiInsetChangedEvent = Instance.new("BindableEvent")
+	guiInsetChangedEvent.Name = "GuiInsetChanged"
+	guiInsetChangedEvent.Parent = RobloxGui
+	guiInsetChangedEvent.Event:connect(function(x1, y1, x2, y2)
+		if currScreenGui and currScreenGui:FindFirstChild("BlackFrame") then
+			currScreenGui.BlackFrame.Position = UDim2.new(0, -x1, 0, -y1)
+			currScreenGui.BlackFrame.Size = UDim2.new(1, x1 + x2, 1, y1 + y2)
+		end
+	end)
+end)
+
+local leaveGameButton, leaveGameTextLabel, errorImage = nil
+
+guiService.ErrorMessageChanged:connect(function()
+	if guiService:GetErrorMessage() ~= '' then
+		if isTenFootInterface then
+			currScreenGui.ErrorFrame.Size = UDim2.new(1, 0, 0, 144)
+			currScreenGui.ErrorFrame.Position = UDim2.new(0, 0, 0, 0)
+			currScreenGui.ErrorFrame.BackgroundColor3 = COLORS.BLACK
+			currScreenGui.ErrorFrame.BackgroundTransparency = 0.5
+			currScreenGui.ErrorFrame.ErrorText.FontSize = Enum.FontSize.Size36
+			currScreenGui.ErrorFrame.ErrorText.Position = UDim2.new(.3, 0, 0, 0)
+			currScreenGui.ErrorFrame.ErrorText.Size = UDim2.new(.4, 0, 0, 144)
+			if errorImage == nil then
+				errorImage = Instance.new("ImageLabel")
+				errorImage.Image = "rbxasset://textures/ui/ErrorIconSmall.png"
+				errorImage.Size = UDim2.new(0, 96, 0, 79)
+				errorImage.Position = UDim2.new(0.228125, 0, 0, 32)
+				errorImage.ZIndex = 9
+				errorImage.BackgroundTransparency = 1
+				errorImage.Parent = currScreenGui.ErrorFrame
+			end
+			-- we show a B button to kill game data model on console
+			if not isTenFootInterface then
+				if leaveGameButton == nil then
+					local RobloxGui = game:GetService("CoreGui"):WaitForChild("RobloxGui")
+					local utility = require(RobloxGui.Modules.Settings.Utility)
+					local textLabel = nil
+					leaveGameButton, leaveGameTextLabel = utility:MakeStyledButton("LeaveGame", "Leave", UDim2.new(0, 288, 0, 78))
+					leaveGameButton:SetVerb("Exit")
+					leaveGameButton.NextSelectionDown = leaveGameButton
+					leaveGameButton.NextSelectionLeft = leaveGameButton
+					leaveGameButton.NextSelectionRight = leaveGameButton
+					leaveGameButton.NextSelectionUp = leaveGameButton
+					leaveGameButton.ZIndex = 9
+					leaveGameButton.Position = UDim2.new(0.771875, 0, 0, 37)
+					leaveGameButton.Parent = currScreenGui.ErrorFrame
+					leaveGameTextLabel.FontSize = Enum.FontSize.Size36
+					leaveGameTextLabel.ZIndex = 10
+					game:GetService("GuiService").SelectedCoreObject = leaveGameButton
+				else
+					game:GetService("GuiService").SelectedCoreObject = leaveGameButton
+				end
+			end
+		end
+		currScreenGui.ErrorFrame.ErrorText.Text = guiService:GetErrorMessage()
+		currScreenGui.ErrorFrame.Visible = true
+		local blackFrame = currScreenGui:FindFirstChild('BlackFrame')
+		if blackFrame then
+			blackFrame.CloseButton.ImageTransparency = 0
+			blackFrame.CloseButton.Active = true
+		end
+	else
+		currScreenGui.ErrorFrame.Visible = false
+	end
+end)
+
+guiService.UiMessageChanged:connect(function(type, newMessage)
+	if type == Enum.UiMessageType.UiMessageInfo then
+		local blackFrame = currScreenGui and currScreenGui:FindFirstChild('BlackFrame')
+		if blackFrame then
+			blackFrame.UiMessageFrame.UiMessage.Text = newMessage
+			if newMessage ~= '' then
+				blackFrame.UiMessageFrame.Visible = true
+			else
+				blackFrame.UiMessageFrame.Visible = false
+			end
+		end
+	end
+end)
+
+if guiService:GetErrorMessage() ~= '' then
+	currScreenGui.ErrorFrame.ErrorText.Text = guiService:GetErrorMessage()
+	currScreenGui.ErrorFrame.Visible = true
+end
+
+
+function stopListeningToRenderingStep()
+	if renderSteppedConnection then
+		renderSteppedConnection:disconnect()
+		renderSteppedConnection = nil
+	end
+end
+
+function fadeAndDestroyBlackFrame(blackFrame)
+	if destroyingBackground then return end
+	destroyingBackground = true
+	spawn(function()
+		local infoFrame = blackFrame:FindFirstChild("InfoFrame")
+		local graphicsFrame = blackFrame:FindFirstChild("GraphicsFrame")
+		
+		if blackFrame:FindFirstChild("InfoFrame") then
+				local infoFrameChildren = infoFrame:GetChildren()
+				local transparency = 0
+				local rateChange = 1.8
+				local lastUpdateTime = nil
+
+				while transparency < 1 do
+					if not lastUpdateTime then
+						lastUpdateTime = tick()
+					else
+						local newTime = tick()
+						transparency = transparency + rateChange * (newTime - lastUpdateTime)
+						for i = 1, #infoFrameChildren do
+							local child = infoFrameChildren[i]
+							if child:IsA('TextLabel') then
+								child.TextTransparency = transparency
+								child.TextStrokeTransparency = transparency
+							elseif child:IsA('ImageLabel') then
+								child.ImageTransparency = transparency
+							end
+						end
+						graphicsFrame.LoadingImage.ImageTransparency = transparency
+						blackFrame.BackgroundTransparency = transparency
+
+						if backgroundImageTransparency < 1 then
+							backgroundImageTransparency = transparency
+							local backgroundImages = blackFrame.BackgroundTextureFrame:GetChildren()
+							for i = 1, #backgroundImages do
+								backgroundImages[i].ImageTransparency = backgroundImageTransparency
+							end
+						end
+
+						lastUpdateTime = newTime
+					end
+					wait()
+				end
+				if blackFrame ~= nil then
+					stopListeningToRenderingStep()
+					blackFrame:Destroy()
+				end
+		end
+	end)
+end
+
+function destroyLoadingElements(instant)
+	if not currScreenGui then return end
+	if destroyedLoadingGui then return end
+	destroyedLoadingGui = true
+
+	local guiChildren = currScreenGui:GetChildren()
+	for i=1, #guiChildren do
+		-- need to keep this around in case we get a connection error later
+		if guiChildren[i].Name ~= "ErrorFrame" then
+			if guiChildren[i].Name == "BlackFrame" and not instant then
+				fadeAndDestroyBlackFrame(guiChildren[i])
+			else
+				guiChildren[i]:Destroy()
+			end
+		end
+	end
+end
+
+-- ====================================================================
+-- FORCED DELETION SEQUENCE: REMOVES GUI AFTER EXACTLY 3 SECONDS NO MATTER WHAT
+-- ====================================================================
+hasReplicatedFirstElements = false
+
+spawn(function()
+	wait(3) -- Display duration forced to exactly 3 seconds
+	if currScreenGui and currScreenGui:FindFirstChild("BlackFrame") then
+		if isTenFootInterface then
+			ContextActionService:UnbindCoreAction('CancelGameLoad')
+		end
+		destroyLoadingElements(false)
+	end
+end)
+
+local UserInputServiceChangedConn;
+local function onUserInputServiceChanged(prop)
+	if prop == 'VREnabled' then
+		local UseVr = false
+		pcall(function() UseVr = UIS.VREnabled end)
+
+		if UseVr then
+			if UserInputServiceChangedConn then
+				UserInputServiceChangedConn:disconnect()
+				UserInputServiceChangedConn = nil
+			end
+			if isTenFootInterface then
+				ContextActionService:UnbindCoreAction('CancelGameLoad')
+			end
+			destroyLoadingElements(true)
+			require(RobloxGui.Modules.LoadingScreen3D)
+		end
+	end
+end
+
+UserInputServiceChangedConn = UIS.Changed:connect(onUserInputServiceChanged)
+onUserInputServiceChanged('VREnabled')
+
+local Players = game:GetService("Players")
+
+local function makeCharacterShiny(character)
+    -- Loop through everything inside the character model
+    for _, object in ipairs(character:GetDescendants()) do
+        if object:IsA("BasePart") then
+            object.Material = Enum.Material.SmoothPlastic
+        end
+    end
+
+    -- Catch any parts (like accessories or clothing limbs) that load in a split second later
+    character.DescendantAdded:Connect(function(object)
+        if object:IsA("BasePart") then
+            object.Material = Enum.Material.SmoothPlastic
+        end
+    end)
+end
+
+-- Handle players who are already in the game
+for _, player in ipairs(Players:GetPlayers()) do
+    if player.Character then
+        makeCharacterShiny(player.Character)
+    end
+    player.CharacterAdded:Connect(makeCharacterShiny)
+end
+
+-- Handle players who join the server later
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(makeCharacterShiny)
+end)
+
+--2016 topbar source code (and it goes the same for 2012-2016 topbars)
+
+-- Services
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+local Lighting = game:GetService("Lighting")
+
+-- Functions
+local Hide = function(Object, Property)
+    if not Object or not Property then
+        warn(`{Object}.{Property} ({debug.traceback()})`)
+    end
+    
+    Object[Property] = false
+    Object:GetPropertyChangedSignal(Property):Connect(function()
+        Object[Property] = false
+    end)
+end
+
+local Create = function(Class: string, Properties: { [string]: any })
+	local Object = Instance.new(Class);
+
+	for Property, Value in next, (Properties or {}) do
+		Object[Property] = Value
+	end
+
+	return Object
+end
+
+local ChangeName = function(Player)
+    local Character = Player.Character or Player.CharacterAdded:Wait()
+    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+
+    if (Humanoid and Humanoid.DisplayName == Player.DisplayName) then
+        Humanoid.DisplayName = Player.Name
+    else
+        Character.ChildAdded:Connect(function(Humanoid)
+            if (Humanoid:IsA("Humanoid") and Humanoid.DisplayName == Player.DisplayName) then
+                Humanoid.DisplayName = Player.Name
+            end
+        end)
+    end
+end
+
+local NameChanger = function(Player)
+    task.spawn(ChangeName, Player)
+    Player.CharacterAdded:Connect(function()
+        task.spawn(ChangeName, Player)
+    end)
+end
+
+-- Variables
+local Settings = getgenv().LegacySettings or ({
+    Year = 2016,
+    OldGraphics = true,
+    HideDisplayName = true,
+})
+
+local RobloxGui = CoreGui:WaitForChild("RobloxGui")
+local RBXM = getgenv().RBXMSuite or loadstring(game:HttpGet("https://raw.githubusercontent.com/yeku/forks/refs/heads/main/Scripts/RBXMSuite.luau"))()
+local Source = RBXM.download("yeku/Legacy@latest", "Legacy.rbxm")
+local Module = RBXM.launch(Source, {
+    runscripts = true,
+    deferred = true,
+    nocirculardeps = true
+})
+
+-- Setup
+RobloxGui.Enabled = false
+RBXM.require(Module):Start(Settings.Year)
+task.spawn(Hide, CoreGui:WaitForChild("TopBarApp", 10):WaitForChild("TopBarApp", 10), "Enabled")
+
+if (Settings.OldGraphics) then
+    task.spawn(function()
+        Lighting.GlobalShadows = false
+
+        for _, Object in next, Lighting:GetChildren() do
+            if (table.find({ "DepthOfFieldEffect", "SunRaysEffect", "BloomEffect", "BlurEffect", "ColorCorrectionEffect", "Atmosphere" }, Object.ClassName)) then
+                if (not Object:IsA("Atmosphere")) then
+                    Hide(Object, "Enabled")
+                else
+                    Object:Destroy()
+                end
+            end
+        end
+
+        Create("ColorCorrectionEffect", {
+            Parent = Lighting,
+            Saturation = 0,
+            Contrast = -0.1,
+        })
+
+        if (sethiddenproperty) then
+            sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility);
+        end
+    end)
+end
+
+if (Settings.HideDisplayName) then
+    for _, Player in next, Players:GetPlayers() do
+        NameChanger(Player)
+    end
+
+    Players.PlayerAdded:Connect(NameChanger)
+end
+
+task.spawn(function()
+    local SettingsShield = RobloxGui:WaitForChild("SettingsClippingShield"):WaitForChild("SettingsShield")
+    local Modal = SettingsShield and SettingsShield:WaitForChild("Modal")
+
+    if (SettingsShield) then
+        Hide(Modal, "Visible")
+        Hide(Modal, "Modal")
+    end
+end)
+
+task.spawn(function()
+    local ControlFrame = RobloxGui:WaitForChild("ControlFrame", 10)
+
+    if (ControlFrame) then
+        ControlFrame:Destroy()
+    end
+end) ]], 
+	Topbar_2015    = [[ --CONTEXT: This script was taken from 2016 corescripts off of ROBLOX's github
+
+spawn(function()
+	local LoadingGui = game:WaitForChild("CoreGui"):WaitForChild("RobloxLoadingGui")
+	LoadingGui.Enabled = false
+	LoadingGui:Destroy()
+end)
+
+-- Creates the generic "ROBLOX" loading screen on startup
+-- Written by ArceusInator & Ben Tkacheff, 2014
+
+-- Constants
+local PLACEID = game.PlaceId
+
+local MPS = game:GetService('MarketplaceService')
+local UIS = game:GetService('UserInputService')
+local guiService = game:GetService("GuiService")
+local ContextActionService = game:GetService('ContextActionService')
+local RobloxGui = game:GetService("CoreGui"):WaitForChild("RobloxGui")
+
+local startTime = tick()
+
+local COLORS = {
+	BLACK = Color3.new(0, 0, 0),
+	BACKGROUND_COLOR = Color3.new(45/255, 45/255, 45/255),
+	WHITE = Color3.new(1, 1, 1),
+	ERROR = Color3.new(253/255,68/255,72/255)
+}
+
+local function getViewportSize()
+	while not game.Workspace.CurrentCamera do
+		game.Workspace.Changed:wait()
+	end
+
+	while game.Workspace.CurrentCamera.ViewportSize == Vector2.new(0,0) do
+		game.Workspace.CurrentCamera.Changed:wait()
+	end
+
+	return game.Workspace.CurrentCamera.ViewportSize
+end
+
+--
+-- Variables
+local GameAssetInfo -- loaded by InfoProvider:LoadAssets()
+local currScreenGui, renderSteppedConnection = nil, nil
+local destroyingBackground, destroyedLoadingGui, hasReplicatedFirstElements = false, false, false
+local backgroundImageTransparency = 0
+local isMobile = (UIS.TouchEnabled == true and UIS.MouseEnabled == false and getViewportSize().Y <= 500)
+local isTenFootInterface = guiService:IsTenFootInterface()
+local platform = UIS:GetPlatform()
+
+local function IsConvertMyPlaceNameInXboxAppEnabled()
+	if UIS:GetPlatform() == Enum.Platform.XBoxOne then
+		local success, flagValue = pcall(function() return settings():GetFFlag("ConvertMyPlaceNameInXboxApp") end)
+		return (success and flagValue == true)
+	end
+	return false
+end
+
+--
+-- Utility functions
+local create = function(className, defaultParent)
+	return function(propertyList)
+		local object = Instance.new(className)
+		local parent = nil
+
+		for index, value in next, propertyList do
+			if type(index) == 'string' then
+				if index == 'Parent' then
+					parent = value
+				else
+					object[index] = value
+				end
+			else
+				if type(value) == 'function' then
+					value(object)
+				elseif type(value) == 'userdata' then
+					value.Parent = object
+				end
+			end
+		end
+		
+		if parent then
+			object.Parent = parent
+		end
+
+		if object.Parent == nil then
+			object.Parent = defaultParent
+		end
+
+		return object
+	end
+end
+
+--
+-- Create objects
+
+local MainGui = {}
+local InfoProvider = {}
+
+
+function ExtractGeneratedUsername(gameName)
+	local tempUsername = string.match(gameName, "^([0-9a-fA-F]+)'s Place$")
+	if tempUsername and #tempUsername == 32 then
+		return tempUsername
+	end
+end
+
+-- Fix places that have been made with incorrect temporary usernames
+function GetFilteredGameName(gameName, creatorName)
+	if gameName and type(gameName) == 'string' then
+		local tempUsername = ExtractGeneratedUsername(gameName)
+		if tempUsername then
+			local newGameName = string.gsub(gameName, tempUsername, creatorName, 1)
+			if newGameName then
+				return newGameName
+			end
+		end
+	end
+	return gameName
+end
+
+
+function InfoProvider:GetGameName()
+	if GameAssetInfo ~= nil then
+		if IsConvertMyPlaceNameInXboxAppEnabled() then
+			return GetFilteredGameName(GameAssetInfo.Name, self:GetCreatorName())
+		else
+			return GameAssetInfo.Name
+		end
+	else
+		return ''
+	end
+end
+
+function InfoProvider:GetCreatorName()
+	if GameAssetInfo ~= nil then
+		return GameAssetInfo.Creator.Name
+	else
+		return ''
+	end
+end
+
+function InfoProvider:LoadAssets()
+	spawn(function()
+		if PLACEID <= 0 then
+			while game.PlaceId <= 0 do
+				wait()
+			end
+			PLACEID = game.PlaceId
+		end
+
+		-- load game asset info
+		coroutine.resume(coroutine.create(function()
+			local success, result = pcall(function()
+				GameAssetInfo = MPS:GetProductInfo(PLACEID)
+			end)
+			if not success then
+				print("LoadingScript->InfoProvider:LoadAssets:", result)
+			end
+		end))
+	end)
+end
+
+function MainGui:tileBackgroundTexture(frameToFill)
+	if not frameToFill then return end
+	frameToFill:ClearAllChildren()
+	if backgroundImageTransparency < 1 then
+		local backgroundTextureSize = Vector2.new(512, 512)
+		for i = 0, math.ceil(frameToFill.AbsoluteSize.X/backgroundTextureSize.X) do
+			for j = 0, math.ceil(frameToFill.AbsoluteSize.Y/backgroundTextureSize.Y) do
+				create 'ImageLabel' {
+					Name = 'BackgroundTextureImage',
+					BackgroundTransparency = 1,
+					ImageTransparency = backgroundImageTransparency,
+					Image = 'rbxasset://textures/loading/darkLoadingTexture.png',
+					Position = UDim2.new(0, i*backgroundTextureSize.X, 0, j*backgroundTextureSize.Y),
+					Size = UDim2.new(0, backgroundTextureSize.X, 0, backgroundTextureSize.Y),
+					ZIndex = 1,
+					Parent = frameToFill
+				}
+			end
+		end
+	end
+end
+
+-- create a cancel binding for console to be able to cancel anytime while loading
+local function createTenfootCancelGui()
+	local cancelLabel = create'ImageLabel'
+	{
+		Name = "CancelLabel";
+		Size = UDim2.new(0, 83, 0, 83);
+		Position = UDim2.new(1, -32 - 83, 0, 32);
+		BackgroundTransparency = 1;
+		Image = 'rbxasset://textures/ui/Shell/ButtonIcons/BButton.png';
+	}
+	local cancelText = create'TextLabel'
+	{
+		Name = "CancelText";
+		Size = UDim2.new(0, 0, 0, 0);
+		Position = UDim2.new(1, -131, 0, 64);
+		BackgroundTransparency = 1;
+		FontSize = Enum.FontSize.Size36;
+		TextXAlignment = Enum.TextXAlignment.Right;
+		TextColor3 = COLORS.WHITE;
+		Text = "Cancel";
+	}
+
+	-- bind cancel action
+	local platformService = nil
+	pcall(function()
+		platformService = game:GetService('PlatformService')
+	end)
+
+	if platformService then
+		if not game:GetService("ReplicatedFirst"):IsFinishedReplicating() then
+			local seenBButtonBegin = false
+			ContextActionService:BindCoreAction("CancelGameLoad",
+				function(actionName, inputState, inputObject)
+					if inputState == Enum.UserInputState.Begin then
+						seenBButtonBegin = true
+					elseif inputState == Enum.UserInputState.End and seenBButtonBegin then
+						cancelLabel:Destroy()
+						cancelText.Text = "Canceling..."
+						cancelText.Position = UDim2.new(1, -32, 0, 64)
+						ContextActionService:UnbindCoreAction('CancelGameLoad')
+						platformService:RequestGameShutdown()
+					end
+				end,
+				false,
+				Enum.KeyCode.ButtonB)
+		end
+	end
+
+	while cancelLabel.Parent == nil do
+		if currScreenGui then
+			local blackFrame = currScreenGui:FindFirstChild('BlackFrame')
+			if blackFrame then
+				cancelLabel.Parent = blackFrame
+				cancelText.Parent = blackFrame
+				break
+			end
+		end
+		wait()
+	end
+end
+
+--
+-- Declare member functions
+function MainGui:GenerateMain()
+	local screenGui = create 'ScreenGui' {
+		Name = 'Custom2016LoadingGui' -- Renamed to prevent automatic self-deletion loop
+	}
+
+	--
+	-- create descendant frames
+	local mainBackgroundContainer = create 'Frame' {
+		Name = 'BlackFrame',
+		BackgroundColor3 = COLORS.BACKGROUND_COLOR,
+		BackgroundTransparency = 0,
+		Size = UDim2.new(1, 0, 1, 36),
+		Position = UDim2.new(0, 0, 0, -36),
+		Active = true,
+		Parent = screenGui,
+	}
+
+		local closeButton =	create 'ImageButton' {
+			Name = 'CloseButton',
+			Image = 'rbxasset://textures/loading/cancelButton.png',
+			ImageTransparency = 1,
+			BackgroundTransparency = 1,
+			Position = UDim2.new(1, -37, 0, 5),
+			Size = UDim2.new(0, 32, 0, 32),
+			Active = false,
+			ZIndex = 10,
+			Parent = mainBackgroundContainer,
+		}
+
+		local graphicsFrame = create 'Frame' {
+			Name = 'GraphicsFrame',
+			BorderSizePixel = 0,
+			BackgroundTransparency = 1,
+			Position = UDim2.new(1, (isMobile == true and -75 or (isTenFootInterface and -245 or -225)), 1, (isMobile == true and -75 or (isTenFootInterface and -185 or -165))),
+			Size = UDim2.new(0, (isMobile == true and 70 or (isTenFootInterface and 140 or 120)), 0, (isMobile == true and 70 or (isTenFootInterface and 140 or 120))),
+			ZIndex = 2,
+			Parent = mainBackgroundContainer,
+		}
+
+			local loadingImage = create 'ImageLabel' {
+				Name = 'LoadingImage',
+				BackgroundTransparency = 1,
+				Image = 'rbxasset://textures/loading/loadingCircle.png',
+				Position = UDim2.new(0, 0, 0, 0),
+				Size = UDim2.new(1, 0, 1, 0),
+				ZIndex = 2,
+				Parent = graphicsFrame,
+			}
+
+			local loadingText = create 'TextLabel' {
+				Name = 'LoadingText',
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, (isMobile == true and -14 or -56), 1, 0),
+				Position = UDim2.new(0, (isMobile == true and 12 or 28), 0, 0),
+				Font = Enum.Font.SourceSans,
+				FontSize = (isMobile == true and Enum.FontSize.Size12 or Enum.FontSize.Size18),
+				TextWrapped = true,
+				TextColor3 = COLORS.WHITE,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Visible = not isTenFootInterface,
+				Text = "Loading...",
+				ZIndex = 2,
+				Parent = graphicsFrame,
+			}
+
+		local uiMessageFrame = create 'Frame' {
+			Name = 'UiMessageFrame',
+			BackgroundTransparency = 1,
+			Position = UDim2.new(0.25, 0, 1, -120),
+			Size = UDim2.new(0.5, 0, 0, 80),
+			ZIndex = 2,
+			Parent = mainBackgroundContainer,
+		}
+
+			local uiMessage = create 'TextLabel' {
+				Name = 'UiMessage',
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 1, 0),
+				Font = Enum.Font.SourceSansBold,
+				FontSize = Enum.FontSize.Size18,
+				TextWrapped = true,
+				TextColor3 = COLORS.WHITE,
+				Text = "",
+				ZIndex = 2,
+				Parent = uiMessageFrame,
+			}
+
+		local infoFrame = create 'Frame' {
+			Name = 'InfoFrame',
+			BackgroundTransparency = 1,
+			Position = UDim2.new(0, (isMobile == true and 20 or 100), 1, (isMobile == true and -120 or -150)),
+			Size = UDim2.new(0.4, 0, 0, 110),
+			ZIndex = 2,
+			Parent = mainBackgroundContainer,
+		}
+
+			local placeLabel = create 'TextLabel' {
+				Name = 'PlaceLabel',
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, 80),
+				Position = UDim2.new(0, 0, 0, 0),
+				Font = Enum.Font.SourceSans,
+				FontSize = (isTenFootInterface and Enum.FontSize.Size48 or Enum.FontSize.Size24),
+				TextWrapped = true,
+				TextScaled = true,
+				TextColor3 = COLORS.WHITE,
+				TextStrokeTransparency = 0,
+				Text = "",
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Bottom,
+				ZIndex = 2,
+				Parent = infoFrame,
+			}
+
+			if isTenFootInterface then
+				local byLabel = create'TextLabel' {
+					Name = "ByLabel",
+					BackgroundTransparency = 1,
+					Size = UDim2.new(0, 36, 0, 30),
+					Position = UDim2.new(0, 0, 0, 80),
+					Font = Enum.Font.SourceSans,
+					FontSize = Enum.FontSize.Size36,
+					TextScaled = true,
+					TextColor3 = COLORS.WHITE,
+					TextStrokeTransparency = 0,
+					Text = "By",
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Top,
+					ZIndex = 2,
+					Visible = false,
+					Parent = infoFrame,
+				}
+				local creatorIcon = create'ImageLabel' {
+					Name = "CreatorIcon",
+					BackgroundTransparency = 1,
+					Size = UDim2.new(0, 30, 0, 30),
+					Position = UDim2.new(0, 38, 0, 80),
+					ImageTransparency = 0,
+					Image = 'rbxasset://textures/ui/Shell/Icons/RobloxIcon32.png',
+					ZIndex = 2,
+					Visible = false,
+					Parent = infoFrame,
+				}
+			end
+
+			local creatorLabel = create 'TextLabel' {
+				Name = 'CreatorLabel',
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, 30),
+				Position = UDim2.new(0, isTenFootInterface and 72 or 0, 0, 80),
+				Font = Enum.Font.SourceSans,
+				FontSize = (isTenFootInterface and Enum.FontSize.Size36 or Enum.FontSize.Size18),
+				TextWrapped = true,
+				TextScaled = true,
+				TextColor3 = COLORS.WHITE,
+				TextStrokeTransparency = 0,
+				Text = "",
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Top,
+				ZIndex = 2,
+				Parent = infoFrame,
+			}
+
+		local backgroundTextureFrame = create 'Frame' {
+			Name = 'BackgroundTextureFrame',
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 1, 0),
+			Position = UDim2.new(0, 0, 0, 0),
+			ClipsDescendants = true,
+			ZIndex = 1,
+			BackgroundTransparency = 1,
+			Parent = mainBackgroundContainer,
+		}
+
+	local errorFrame = create 'Frame' {
+		Name = 'ErrorFrame',
+		BackgroundColor3 = COLORS.ERROR,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0.25,0,0,0),
+		Size = UDim2.new(0.5, 0, 0, 80),
+		ZIndex = 8,
+		Visible = false,
+		Parent = screenGui,
+	}
+
+		local errorText = create 'TextLabel' {
+			Name = "ErrorText",
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 1, 0),
+			Font = Enum.Font.SourceSansBold,
+			FontSize = Enum.FontSize.Size14,
+			TextWrapped = true,
+			TextColor3 = COLORS.WHITE,
+			Text = "",
+			ZIndex = 8,
+			Parent = errorFrame,
+		}
+
+	while not game:GetService("CoreGui") do
+		wait()
+	end
+	screenGui.Parent = game:GetService("CoreGui")
+	currScreenGui = screenGui
+end
+
+function round(num, idp)
+  local mult = 10^(idp or 0)
+  return math.floor(num * mult + 0.5) / mult
+end
+
+---------------------------------------------------------
+-- Main Script (show something now + setup connections)
+
+-- start loading assets asap
+InfoProvider:LoadAssets()
+MainGui:GenerateMain()
+if isTenFootInterface then
+	createTenfootCancelGui()
+end
+
+local lastRenderTime, lastDotUpdateTime, brickCountChange = nil, nil, nil
+local fadeCycleTime = 1.7
+local turnCycleTime = 2
+local lastAbsoluteSize = Vector2.new(0, 0)
+local loadingDots = "..."
+local dotChangeTime = .2
+local lastBrickCount = 0
+
+renderSteppedConnection = game:GetService("RunService").RenderStepped:connect(function()
+	if not currScreenGui then return end
+	if not currScreenGui:FindFirstChild("BlackFrame") then return end
+
+	if setVerb then
+		currScreenGui.BlackFrame.CloseButton:SetVerb("Exit")
+		setVerb = false
+	end
+
+	if currScreenGui.BlackFrame:FindFirstChild("BackgroundTextureFrame") and currScreenGui.BlackFrame.BackgroundTextureFrame.AbsoluteSize ~= lastAbsoluteSize then
+		lastAbsoluteSize = currScreenGui.BlackFrame.BackgroundTextureFrame.AbsoluteSize
+		MainGui:tileBackgroundTexture(currScreenGui.BlackFrame.BackgroundTextureFrame)
+	end
+
+	local infoFrame = currScreenGui.BlackFrame:FindFirstChild('InfoFrame')
+	if infoFrame then
+		-- set place name
+		local placeLabel = infoFrame:FindFirstChild('PlaceLabel')
+		if placeLabel and placeLabel.Text == "" then
+			placeLabel.Text = InfoProvider:GetGameName()
+		end
+
+		-- set creator name
+		local creatorLabel = infoFrame:FindFirstChild('CreatorLabel')
+		if creatorLabel and creatorLabel.Text == "" then
+			local creatorName = InfoProvider:GetCreatorName()
+			if creatorName ~= "" then
+				if isTenFootInterface then
+					local showDevName = true
+					if platform == Enum.Platform.XBoxOne then
+						local success, result = pcall(function()
+							return settings():GetFFlag("ShowDevNameInXboxApp")
+						end)
+						if success then
+							showDevName = result
+						end
+					end
+					creatorLabel.Text = showDevName and creatorName or ""
+					local creatorIcon = infoFrame:FindFirstChild('CreatorIcon')
+					local byLabel = infoFrame:FindFirstChild('ByLabel')
+					if creatorIcon then creatorIcon.Visible = showDevName end
+					if byLabel then byLabel.Visible = showDevName end
+				else
+					creatorLabel.Text = "By "..creatorName
+				end
+			end
+		end
+	end
+
+	if not lastRenderTime then
+		lastRenderTime = tick()
+		lastDotUpdateTime = lastRenderTime
+		return
+	end
+
+	local currentTime = tick()
+	local fadeAmount = (currentTime - lastRenderTime) * fadeCycleTime
+	local turnAmount = (currentTime - lastRenderTime) * (360/turnCycleTime)
+	lastRenderTime = currentTime
+
+	currScreenGui.BlackFrame.GraphicsFrame.LoadingImage.Rotation = currScreenGui.BlackFrame.GraphicsFrame.LoadingImage.Rotation + turnAmount
+
+	local updateLoadingDots =  function()
+		loadingDots = loadingDots.. "."
+		if loadingDots == "...." then
+			loadingDots = ""
+		end
+		currScreenGui.BlackFrame.GraphicsFrame.LoadingText.Text = "Loading" ..loadingDots
+	end
+
+	if currentTime - lastDotUpdateTime >= dotChangeTime and InfoProvider:GetCreatorName() == "" then
+		lastDotUpdateTime = currentTime
+		updateLoadingDots()
+	else
+		if guiService:GetBrickCount() > 0 then
+			if brickCountChange == nil then
+				brickCountChange = guiService:GetBrickCount()
+			end
+			if guiService:GetBrickCount() - lastBrickCount >= brickCountChange then
+				lastBrickCount = guiService:GetBrickCount()
+				updateLoadingDots()
+			end
+		end
+	end
+
+	if not isTenFootInterface then
+		if currentTime - startTime > 5 and currScreenGui.BlackFrame.CloseButton.ImageTransparency > 0 then
+			currScreenGui.BlackFrame.CloseButton.ImageTransparency = currScreenGui.BlackFrame.CloseButton.ImageTransparency - fadeAmount
+
+			if currScreenGui.BlackFrame.CloseButton.ImageTransparency <= 0 then
+				currScreenGui.BlackFrame.CloseButton.Active = true
+			end
+		end
+	end
+end)
+
+spawn(function()
+	local RobloxGui = game:GetService("CoreGui"):WaitForChild("RobloxGui")
+	local guiInsetChangedEvent = Instance.new("BindableEvent")
+	guiInsetChangedEvent.Name = "GuiInsetChanged"
+	guiInsetChangedEvent.Parent = RobloxGui
+	guiInsetChangedEvent.Event:connect(function(x1, y1, x2, y2)
+		if currScreenGui and currScreenGui:FindFirstChild("BlackFrame") then
+			currScreenGui.BlackFrame.Position = UDim2.new(0, -x1, 0, -y1)
+			currScreenGui.BlackFrame.Size = UDim2.new(1, x1 + x2, 1, y1 + y2)
+		end
+	end)
+end)
+
+local leaveGameButton, leaveGameTextLabel, errorImage = nil
+
+guiService.ErrorMessageChanged:connect(function()
+	if guiService:GetErrorMessage() ~= '' then
+		if isTenFootInterface then
+			currScreenGui.ErrorFrame.Size = UDim2.new(1, 0, 0, 144)
+			currScreenGui.ErrorFrame.Position = UDim2.new(0, 0, 0, 0)
+			currScreenGui.ErrorFrame.BackgroundColor3 = COLORS.BLACK
+			currScreenGui.ErrorFrame.BackgroundTransparency = 0.5
+			currScreenGui.ErrorFrame.ErrorText.FontSize = Enum.FontSize.Size36
+			currScreenGui.ErrorFrame.ErrorText.Position = UDim2.new(.3, 0, 0, 0)
+			currScreenGui.ErrorFrame.ErrorText.Size = UDim2.new(.4, 0, 0, 144)
+			if errorImage == nil then
+				errorImage = Instance.new("ImageLabel")
+				errorImage.Image = "rbxasset://textures/ui/ErrorIconSmall.png"
+				errorImage.Size = UDim2.new(0, 96, 0, 79)
+				errorImage.Position = UDim2.new(0.228125, 0, 0, 32)
+				errorImage.ZIndex = 9
+				errorImage.BackgroundTransparency = 1
+				errorImage.Parent = currScreenGui.ErrorFrame
+			end
+			-- we show a B button to kill game data model on console
+			if not isTenFootInterface then
+				if leaveGameButton == nil then
+					local RobloxGui = game:GetService("CoreGui"):WaitForChild("RobloxGui")
+					local utility = require(RobloxGui.Modules.Settings.Utility)
+					local textLabel = nil
+					leaveGameButton, leaveGameTextLabel = utility:MakeStyledButton("LeaveGame", "Leave", UDim2.new(0, 288, 0, 78))
+					leaveGameButton:SetVerb("Exit")
+					leaveGameButton.NextSelectionDown = leaveGameButton
+					leaveGameButton.NextSelectionLeft = leaveGameButton
+					leaveGameButton.NextSelectionRight = leaveGameButton
+					leaveGameButton.NextSelectionUp = leaveGameButton
+					leaveGameButton.ZIndex = 9
+					leaveGameButton.Position = UDim2.new(0.771875, 0, 0, 37)
+					leaveGameButton.Parent = currScreenGui.ErrorFrame
+					leaveGameTextLabel.FontSize = Enum.FontSize.Size36
+					leaveGameTextLabel.ZIndex = 10
+					game:GetService("GuiService").SelectedCoreObject = leaveGameButton
+				else
+					game:GetService("GuiService").SelectedCoreObject = leaveGameButton
+				end
+			end
+		end
+		currScreenGui.ErrorFrame.ErrorText.Text = guiService:GetErrorMessage()
+		currScreenGui.ErrorFrame.Visible = true
+		local blackFrame = currScreenGui:FindFirstChild('BlackFrame')
+		if blackFrame then
+			blackFrame.CloseButton.ImageTransparency = 0
+			blackFrame.CloseButton.Active = true
+		end
+	else
+		currScreenGui.ErrorFrame.Visible = false
+	end
+end)
+
+guiService.UiMessageChanged:connect(function(type, newMessage)
+	if type == Enum.UiMessageType.UiMessageInfo then
+		local blackFrame = currScreenGui and currScreenGui:FindFirstChild('BlackFrame')
+		if blackFrame then
+			blackFrame.UiMessageFrame.UiMessage.Text = newMessage
+			if newMessage ~= '' then
+				blackFrame.UiMessageFrame.Visible = true
+			else
+				blackFrame.UiMessageFrame.Visible = false
+			end
+		end
+	end
+end)
+
+if guiService:GetErrorMessage() ~= '' then
+	currScreenGui.ErrorFrame.ErrorText.Text = guiService:GetErrorMessage()
+	currScreenGui.ErrorFrame.Visible = true
+end
+
+
+function stopListeningToRenderingStep()
+	if renderSteppedConnection then
+		renderSteppedConnection:disconnect()
+		renderSteppedConnection = nil
+	end
+end
+
+function fadeAndDestroyBlackFrame(blackFrame)
+	if destroyingBackground then return end
+	destroyingBackground = true
+	spawn(function()
+		local infoFrame = blackFrame:FindFirstChild("InfoFrame")
+		local graphicsFrame = blackFrame:FindFirstChild("GraphicsFrame")
+		
+		if blackFrame:FindFirstChild("InfoFrame") then
+				local infoFrameChildren = infoFrame:GetChildren()
+				local transparency = 0
+				local rateChange = 1.8
+				local lastUpdateTime = nil
+
+				while transparency < 1 do
+					if not lastUpdateTime then
+						lastUpdateTime = tick()
+					else
+						local newTime = tick()
+						transparency = transparency + rateChange * (newTime - lastUpdateTime)
+						for i = 1, #infoFrameChildren do
+							local child = infoFrameChildren[i]
+							if child:IsA('TextLabel') then
+								child.TextTransparency = transparency
+								child.TextStrokeTransparency = transparency
+							elseif child:IsA('ImageLabel') then
+								child.ImageTransparency = transparency
+							end
+						end
+						graphicsFrame.LoadingImage.ImageTransparency = transparency
+						blackFrame.BackgroundTransparency = transparency
+
+						if backgroundImageTransparency < 1 then
+							backgroundImageTransparency = transparency
+							local backgroundImages = blackFrame.BackgroundTextureFrame:GetChildren()
+							for i = 1, #backgroundImages do
+								backgroundImages[i].ImageTransparency = backgroundImageTransparency
+							end
+						end
+
+						lastUpdateTime = newTime
+					end
+					wait()
+				end
+				if blackFrame ~= nil then
+					stopListeningToRenderingStep()
+					blackFrame:Destroy()
+				end
+		end
+	end)
+end
+
+function destroyLoadingElements(instant)
+	if not currScreenGui then return end
+	if destroyedLoadingGui then return end
+	destroyedLoadingGui = true
+
+	local guiChildren = currScreenGui:GetChildren()
+	for i=1, #guiChildren do
+		-- need to keep this around in case we get a connection error later
+		if guiChildren[i].Name ~= "ErrorFrame" then
+			if guiChildren[i].Name == "BlackFrame" and not instant then
+				fadeAndDestroyBlackFrame(guiChildren[i])
+			else
+				guiChildren[i]:Destroy()
+			end
+		end
+	end
+end
+
+-- ====================================================================
+-- FORCED DELETION SEQUENCE: REMOVES GUI AFTER EXACTLY 3 SECONDS NO MATTER WHAT
+-- ====================================================================
+hasReplicatedFirstElements = false
+
+spawn(function()
+	wait(3) -- Display duration forced to exactly 3 seconds
+	if currScreenGui and currScreenGui:FindFirstChild("BlackFrame") then
+		if isTenFootInterface then
+			ContextActionService:UnbindCoreAction('CancelGameLoad')
+		end
+		destroyLoadingElements(false)
+	end
+end)
+
+local UserInputServiceChangedConn;
+local function onUserInputServiceChanged(prop)
+	if prop == 'VREnabled' then
+		local UseVr = false
+		pcall(function() UseVr = UIS.VREnabled end)
+
+		if UseVr then
+			if UserInputServiceChangedConn then
+				UserInputServiceChangedConn:disconnect()
+				UserInputServiceChangedConn = nil
+			end
+			if isTenFootInterface then
+				ContextActionService:UnbindCoreAction('CancelGameLoad')
+			end
+			destroyLoadingElements(true)
+			require(RobloxGui.Modules.LoadingScreen3D)
+		end
+	end
+end
+
+UserInputServiceChangedConn = UIS.Changed:connect(onUserInputServiceChanged)
+onUserInputServiceChanged('VREnabled')
+
+local Players = game:GetService("Players")
+
+local function makeCharacterShiny(character)
+    -- Loop through everything inside the character model
+    for _, object in ipairs(character:GetDescendants()) do
+        if object:IsA("BasePart") then
+            object.Material = Enum.Material.SmoothPlastic
+        end
+    end
+
+    -- Catch any parts (like accessories or clothing limbs) that load in a split second later
+    character.DescendantAdded:Connect(function(object)
+        if object:IsA("BasePart") then
+            object.Material = Enum.Material.SmoothPlastic
+        end
+    end)
+end
+
+-- Handle players who are already in the game
+for _, player in ipairs(Players:GetPlayers()) do
+    if player.Character then
+        makeCharacterShiny(player.Character)
+    end
+    player.CharacterAdded:Connect(makeCharacterShiny)
+end
+
+-- Handle players who join the server later
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(makeCharacterShiny)
+end)
+
+--2015 topbar source code
+
+-- Services
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+local Lighting = game:GetService("Lighting")
+
+-- Functions
+local Hide = function(Object, Property)
+    if not Object or not Property then
+        warn(`{Object}.{Property} ({debug.traceback()})`)
+    end
+    
+    Object[Property] = false
+    Object:GetPropertyChangedSignal(Property):Connect(function()
+        Object[Property] = false
+    end)
+end
+
+local Create = function(Class: string, Properties: { [string]: any })
+	local Object = Instance.new(Class);
+
+	for Property, Value in next, (Properties or {}) do
+		Object[Property] = Value
+	end
+
+	return Object
+end
+
+local ChangeName = function(Player)
+    local Character = Player.Character or Player.CharacterAdded:Wait()
+    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+
+    if (Humanoid and Humanoid.DisplayName == Player.DisplayName) then
+        Humanoid.DisplayName = Player.Name
+    else
+        Character.ChildAdded:Connect(function(Humanoid)
+            if (Humanoid:IsA("Humanoid") and Humanoid.DisplayName == Player.DisplayName) then
+                Humanoid.DisplayName = Player.Name
+            end
+        end)
+    end
+end
+
+local NameChanger = function(Player)
+    task.spawn(ChangeName, Player)
+    Player.CharacterAdded:Connect(function()
+        task.spawn(ChangeName, Player)
+    end)
+end
+
+-- Variables
+local Settings = getgenv().LegacySettings or ({
+    Year = 2015,
+    OldGraphics = true,
+    HideDisplayName = true,
+})
+
+local RobloxGui = CoreGui:WaitForChild("RobloxGui")
+local RBXM = getgenv().RBXMSuite or loadstring(game:HttpGet("https://raw.githubusercontent.com/yeku/forks/refs/heads/main/Scripts/RBXMSuite.luau"))()
+local Source = RBXM.download("yeku/Legacy@latest", "Legacy.rbxm")
+local Module = RBXM.launch(Source, {
+    runscripts = true,
+    deferred = true,
+    nocirculardeps = true
+})
+
+-- Setup
+RobloxGui.Enabled = false
+RBXM.require(Module):Start(Settings.Year)
+task.spawn(Hide, CoreGui:WaitForChild("TopBarApp", 10):WaitForChild("TopBarApp", 10), "Enabled")
+
+if (Settings.OldGraphics) then
+    task.spawn(function()
+        Lighting.GlobalShadows = false
+
+        for _, Object in next, Lighting:GetChildren() do
+            if (table.find({ "DepthOfFieldEffect", "SunRaysEffect", "BloomEffect", "BlurEffect", "ColorCorrectionEffect", "Atmosphere" }, Object.ClassName)) then
+                if (not Object:IsA("Atmosphere")) then
+                    Hide(Object, "Enabled")
+                else
+                    Object:Destroy()
+                end
+            end
+        end
+
+        Create("ColorCorrectionEffect", {
+            Parent = Lighting,
+            Saturation = 0,
+            Contrast = -0.1,
+        })
+
+        if (sethiddenproperty) then
+            sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility);
+        end
+    end)
+end
+
+if (Settings.HideDisplayName) then
+    for _, Player in next, Players:GetPlayers() do
+        NameChanger(Player)
+    end
+
+    Players.PlayerAdded:Connect(NameChanger)
+end
+
+task.spawn(function()
+    local SettingsShield = RobloxGui:WaitForChild("SettingsClippingShield"):WaitForChild("SettingsShield")
+    local Modal = SettingsShield and SettingsShield:WaitForChild("Modal")
+
+    if (SettingsShield) then
+        Hide(Modal, "Visible")
+        Hide(Modal, "Modal")
+    end
+end)
+
+task.spawn(function()
+    local ControlFrame = RobloxGui:WaitForChild("ControlFrame", 10)
+
+    if (ControlFrame) then
+        ControlFrame:Destroy()
+    end
+end)]], 
+    Topbar_2014    = [[ --CONTEXT: This script was taken from 2016 corescripts off of ROBLOX's github
+
+
+spawn(function()
+	local LoadingGui = game:WaitForChild("CoreGui"):WaitForChild("RobloxLoadingGui")
+	LoadingGui.Enabled = false
+	LoadingGui:Destroy()
+end)
+
+-- Creates the generic "ROBLOX" loading screen on startup
+-- Written by ArceusInator & Ben Tkacheff, 2014
+
+-- Constants
+local PLACEID = game.PlaceId
+
+local MPS = game:GetService('MarketplaceService')
+local UIS = game:GetService('UserInputService')
+local guiService = game:GetService("GuiService")
+local ContextActionService = game:GetService('ContextActionService')
+local RobloxGui = game:GetService("CoreGui"):WaitForChild("RobloxGui")
+
+local startTime = tick()
+
+local COLORS = {
+	BLACK = Color3.new(0, 0, 0),
+	BACKGROUND_COLOR = Color3.new(45/255, 45/255, 45/255),
+	WHITE = Color3.new(1, 1, 1),
+	ERROR = Color3.new(253/255,68/255,72/255)
+}
+
+local function getViewportSize()
+	while not game.Workspace.CurrentCamera do
+		game.Workspace.Changed:wait()
+	end
+
+	while game.Workspace.CurrentCamera.ViewportSize == Vector2.new(0,0) do
+		game.Workspace.CurrentCamera.Changed:wait()
+	end
+
+	return game.Workspace.CurrentCamera.ViewportSize
+end
+
+--
+-- Variables
+local GameAssetInfo -- loaded by InfoProvider:LoadAssets()
+local currScreenGui, renderSteppedConnection = nil, nil
+local destroyingBackground, destroyedLoadingGui, hasReplicatedFirstElements = false, false, false
+local backgroundImageTransparency = 0
+local isMobile = (UIS.TouchEnabled == true and UIS.MouseEnabled == false and getViewportSize().Y <= 500)
+local isTenFootInterface = guiService:IsTenFootInterface()
+local platform = UIS:GetPlatform()
+
+local function IsConvertMyPlaceNameInXboxAppEnabled()
+	if UIS:GetPlatform() == Enum.Platform.XBoxOne then
+		local success, flagValue = pcall(function() return settings():GetFFlag("ConvertMyPlaceNameInXboxApp") end)
+		return (success and flagValue == true)
+	end
+	return false
+end
+
+--
+-- Utility functions
+local create = function(className, defaultParent)
+	return function(propertyList)
+		local object = Instance.new(className)
+		local parent = nil
+
+		for index, value in next, propertyList do
+			if type(index) == 'string' then
+				if index == 'Parent' then
+					parent = value
+				else
+					object[index] = value
+				end
+			else
+				if type(value) == 'function' then
+					value(object)
+				elseif type(value) == 'userdata' then
+					value.Parent = object
+				end
+			end
+		end
+		
+		if parent then
+			object.Parent = parent
+		end
+
+		if object.Parent == nil then
+			object.Parent = defaultParent
+		end
+
+		return object
+	end
+end
+
+--
+-- Create objects
+
+local MainGui = {}
+local InfoProvider = {}
+
+
+function ExtractGeneratedUsername(gameName)
+	local tempUsername = string.match(gameName, "^([0-9a-fA-F]+)'s Place$")
+	if tempUsername and #tempUsername == 32 then
+		return tempUsername
+	end
+end
+
+-- Fix places that have been made with incorrect temporary usernames
+function GetFilteredGameName(gameName, creatorName)
+	if gameName and type(gameName) == 'string' then
+		local tempUsername = ExtractGeneratedUsername(gameName)
+		if tempUsername then
+			local newGameName = string.gsub(gameName, tempUsername, creatorName, 1)
+			if newGameName then
+				return newGameName
+			end
+		end
+	end
+	return gameName
+end
+
+
+function InfoProvider:GetGameName()
+	if GameAssetInfo ~= nil then
+		if IsConvertMyPlaceNameInXboxAppEnabled() then
+			return GetFilteredGameName(GameAssetInfo.Name, self:GetCreatorName())
+		else
+			return GameAssetInfo.Name
+		end
+	else
+		return ''
+	end
+end
+
+function InfoProvider:GetCreatorName()
+	if GameAssetInfo ~= nil then
+		return GameAssetInfo.Creator.Name
+	else
+		return ''
+	end
+end
+
+function InfoProvider:LoadAssets()
+	spawn(function()
+		if PLACEID <= 0 then
+			while game.PlaceId <= 0 do
+				wait()
+			end
+			PLACEID = game.PlaceId
+		end
+
+		-- load game asset info
+		coroutine.resume(coroutine.create(function()
+			local success, result = pcall(function()
+				GameAssetInfo = MPS:GetProductInfo(PLACEID)
+			end)
+			if not success then
+				print("LoadingScript->InfoProvider:LoadAssets:", result)
+			end
+		end))
+	end)
+end
+
+function MainGui:tileBackgroundTexture(frameToFill)
+	if not frameToFill then return end
+	frameToFill:ClearAllChildren()
+	if backgroundImageTransparency < 1 then
+		local backgroundTextureSize = Vector2.new(512, 512)
+		for i = 0, math.ceil(frameToFill.AbsoluteSize.X/backgroundTextureSize.X) do
+			for j = 0, math.ceil(frameToFill.AbsoluteSize.Y/backgroundTextureSize.Y) do
+				create 'ImageLabel' {
+					Name = 'BackgroundTextureImage',
+					BackgroundTransparency = 1,
+					ImageTransparency = backgroundImageTransparency,
+					Image = 'rbxasset://textures/loading/darkLoadingTexture.png',
+					Position = UDim2.new(0, i*backgroundTextureSize.X, 0, j*backgroundTextureSize.Y),
+					Size = UDim2.new(0, backgroundTextureSize.X, 0, backgroundTextureSize.Y),
+					ZIndex = 1,
+					Parent = frameToFill
+				}
+			end
+		end
+	end
+end
+
+-- create a cancel binding for console to be able to cancel anytime while loading
+local function createTenfootCancelGui()
+	local cancelLabel = create'ImageLabel'
+	{
+		Name = "CancelLabel";
+		Size = UDim2.new(0, 83, 0, 83);
+		Position = UDim2.new(1, -32 - 83, 0, 32);
+		BackgroundTransparency = 1;
+		Image = 'rbxasset://textures/ui/Shell/ButtonIcons/BButton.png';
+	}
+	local cancelText = create'TextLabel'
+	{
+		Name = "CancelText";
+		Size = UDim2.new(0, 0, 0, 0);
+		Position = UDim2.new(1, -131, 0, 64);
+		BackgroundTransparency = 1;
+		FontSize = Enum.FontSize.Size36;
+		TextXAlignment = Enum.TextXAlignment.Right;
+		TextColor3 = COLORS.WHITE;
+		Text = "Cancel";
+	}
+
+	-- bind cancel action
+	local platformService = nil
+	pcall(function()
+		platformService = game:GetService('PlatformService')
+	end)
+
+	if platformService then
+		if not game:GetService("ReplicatedFirst"):IsFinishedReplicating() then
+			local seenBButtonBegin = false
+			ContextActionService:BindCoreAction("CancelGameLoad",
+				function(actionName, inputState, inputObject)
+					if inputState == Enum.UserInputState.Begin then
+						seenBButtonBegin = true
+					elseif inputState == Enum.UserInputState.End and seenBButtonBegin then
+						cancelLabel:Destroy()
+						cancelText.Text = "Canceling..."
+						cancelText.Position = UDim2.new(1, -32, 0, 64)
+						ContextActionService:UnbindCoreAction('CancelGameLoad')
+						platformService:RequestGameShutdown()
+					end
+				end,
+				false,
+				Enum.KeyCode.ButtonB)
+		end
+	end
+
+	while cancelLabel.Parent == nil do
+		if currScreenGui then
+			local blackFrame = currScreenGui:FindFirstChild('BlackFrame')
+			if blackFrame then
+				cancelLabel.Parent = blackFrame
+				cancelText.Parent = blackFrame
+				break
+			end
+		end
+		wait()
+	end
+end
+
+--
+-- Declare member functions
+function MainGui:GenerateMain()
+	local screenGui = create 'ScreenGui' {
+		Name = 'Custom2016LoadingGui' -- Renamed to prevent automatic self-deletion loop
+	}
+
+	--
+	-- create descendant frames
+	local mainBackgroundContainer = create 'Frame' {
+		Name = 'BlackFrame',
+		BackgroundColor3 = COLORS.BACKGROUND_COLOR,
+		BackgroundTransparency = 0,
+		Size = UDim2.new(1, 0, 1, 36),
+		Position = UDim2.new(0, 0, 0, -36),
+		Active = true,
+		Parent = screenGui,
+	}
+
+		local closeButton =	create 'ImageButton' {
+			Name = 'CloseButton',
+			Image = 'rbxasset://textures/loading/cancelButton.png',
+			ImageTransparency = 1,
+			BackgroundTransparency = 1,
+			Position = UDim2.new(1, -37, 0, 5),
+			Size = UDim2.new(0, 32, 0, 32),
+			Active = false,
+			ZIndex = 10,
+			Parent = mainBackgroundContainer,
+		}
+
+		local graphicsFrame = create 'Frame' {
+			Name = 'GraphicsFrame',
+			BorderSizePixel = 0,
+			BackgroundTransparency = 1,
+			Position = UDim2.new(1, (isMobile == true and -75 or (isTenFootInterface and -245 or -225)), 1, (isMobile == true and -75 or (isTenFootInterface and -185 or -165))),
+			Size = UDim2.new(0, (isMobile == true and 70 or (isTenFootInterface and 140 or 120)), 0, (isMobile == true and 70 or (isTenFootInterface and 140 or 120))),
+			ZIndex = 2,
+			Parent = mainBackgroundContainer,
+		}
+
+			local loadingImage = create 'ImageLabel' {
+				Name = 'LoadingImage',
+				BackgroundTransparency = 1,
+				Image = 'rbxasset://textures/loading/loadingCircle.png',
+				Position = UDim2.new(0, 0, 0, 0),
+				Size = UDim2.new(1, 0, 1, 0),
+				ZIndex = 2,
+				Parent = graphicsFrame,
+			}
+
+			local loadingText = create 'TextLabel' {
+				Name = 'LoadingText',
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, (isMobile == true and -14 or -56), 1, 0),
+				Position = UDim2.new(0, (isMobile == true and 12 or 28), 0, 0),
+				Font = Enum.Font.SourceSans,
+				FontSize = (isMobile == true and Enum.FontSize.Size12 or Enum.FontSize.Size18),
+				TextWrapped = true,
+				TextColor3 = COLORS.WHITE,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Visible = not isTenFootInterface,
+				Text = "Loading...",
+				ZIndex = 2,
+				Parent = graphicsFrame,
+			}
+
+		local uiMessageFrame = create 'Frame' {
+			Name = 'UiMessageFrame',
+			BackgroundTransparency = 1,
+			Position = UDim2.new(0.25, 0, 1, -120),
+			Size = UDim2.new(0.5, 0, 0, 80),
+			ZIndex = 2,
+			Parent = mainBackgroundContainer,
+		}
+
+			local uiMessage = create 'TextLabel' {
+				Name = 'UiMessage',
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 1, 0),
+				Font = Enum.Font.SourceSansBold,
+				FontSize = Enum.FontSize.Size18,
+				TextWrapped = true,
+				TextColor3 = COLORS.WHITE,
+				Text = "",
+				ZIndex = 2,
+				Parent = uiMessageFrame,
+			}
+
+		local infoFrame = create 'Frame' {
+			Name = 'InfoFrame',
+			BackgroundTransparency = 1,
+			Position = UDim2.new(0, (isMobile == true and 20 or 100), 1, (isMobile == true and -120 or -150)),
+			Size = UDim2.new(0.4, 0, 0, 110),
+			ZIndex = 2,
+			Parent = mainBackgroundContainer,
+		}
+
+			local placeLabel = create 'TextLabel' {
+				Name = 'PlaceLabel',
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, 80),
+				Position = UDim2.new(0, 0, 0, 0),
+				Font = Enum.Font.SourceSans,
+				FontSize = (isTenFootInterface and Enum.FontSize.Size48 or Enum.FontSize.Size24),
+				TextWrapped = true,
+				TextScaled = true,
+				TextColor3 = COLORS.WHITE,
+				TextStrokeTransparency = 0,
+				Text = "",
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Bottom,
+				ZIndex = 2,
+				Parent = infoFrame,
+			}
+
+			if isTenFootInterface then
+				local byLabel = create'TextLabel' {
+					Name = "ByLabel",
+					BackgroundTransparency = 1,
+					Size = UDim2.new(0, 36, 0, 30),
+					Position = UDim2.new(0, 0, 0, 80),
+					Font = Enum.Font.SourceSans,
+					FontSize = Enum.FontSize.Size36,
+					TextScaled = true,
+					TextColor3 = COLORS.WHITE,
+					TextStrokeTransparency = 0,
+					Text = "By",
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Top,
+					ZIndex = 2,
+					Visible = false,
+					Parent = infoFrame,
+				}
+				local creatorIcon = create'ImageLabel' {
+					Name = "CreatorIcon",
+					BackgroundTransparency = 1,
+					Size = UDim2.new(0, 30, 0, 30),
+					Position = UDim2.new(0, 38, 0, 80),
+					ImageTransparency = 0,
+					Image = 'rbxasset://textures/ui/Shell/Icons/RobloxIcon32.png',
+					ZIndex = 2,
+					Visible = false,
+					Parent = infoFrame,
+				}
+			end
+
+			local creatorLabel = create 'TextLabel' {
+				Name = 'CreatorLabel',
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, 30),
+				Position = UDim2.new(0, isTenFootInterface and 72 or 0, 0, 80),
+				Font = Enum.Font.SourceSans,
+				FontSize = (isTenFootInterface and Enum.FontSize.Size36 or Enum.FontSize.Size18),
+				TextWrapped = true,
+				TextScaled = true,
+				TextColor3 = COLORS.WHITE,
+				TextStrokeTransparency = 0,
+				Text = "",
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Top,
+				ZIndex = 2,
+				Parent = infoFrame,
+			}
+
+		local backgroundTextureFrame = create 'Frame' {
+			Name = 'BackgroundTextureFrame',
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 1, 0),
+			Position = UDim2.new(0, 0, 0, 0),
+			ClipsDescendants = true,
+			ZIndex = 1,
+			BackgroundTransparency = 1,
+			Parent = mainBackgroundContainer,
+		}
+
+	local errorFrame = create 'Frame' {
+		Name = 'ErrorFrame',
+		BackgroundColor3 = COLORS.ERROR,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0.25,0,0,0),
+		Size = UDim2.new(0.5, 0, 0, 80),
+		ZIndex = 8,
+		Visible = false,
+		Parent = screenGui,
+	}
+
+		local errorText = create 'TextLabel' {
+			Name = "ErrorText",
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 1, 0),
+			Font = Enum.Font.SourceSansBold,
+			FontSize = Enum.FontSize.Size14,
+			TextWrapped = true,
+			TextColor3 = COLORS.WHITE,
+			Text = "",
+			ZIndex = 8,
+			Parent = errorFrame,
+		}
+
+	while not game:GetService("CoreGui") do
+		wait()
+	end
+	screenGui.Parent = game:GetService("CoreGui")
+	currScreenGui = screenGui
+end
+
+function round(num, idp)
+  local mult = 10^(idp or 0)
+  return math.floor(num * mult + 0.5) / mult
+end
+
+---------------------------------------------------------
+-- Main Script (show something now + setup connections)
+
+-- start loading assets asap
+InfoProvider:LoadAssets()
+MainGui:GenerateMain()
+if isTenFootInterface then
+	createTenfootCancelGui()
+end
+
+local lastRenderTime, lastDotUpdateTime, brickCountChange = nil, nil, nil
+local fadeCycleTime = 1.7
+local turnCycleTime = 2
+local lastAbsoluteSize = Vector2.new(0, 0)
+local loadingDots = "..."
+local dotChangeTime = .2
+local lastBrickCount = 0
+
+renderSteppedConnection = game:GetService("RunService").RenderStepped:connect(function()
+	if not currScreenGui then return end
+	if not currScreenGui:FindFirstChild("BlackFrame") then return end
+
+	if setVerb then
+		currScreenGui.BlackFrame.CloseButton:SetVerb("Exit")
+		setVerb = false
+	end
+
+	if currScreenGui.BlackFrame:FindFirstChild("BackgroundTextureFrame") and currScreenGui.BlackFrame.BackgroundTextureFrame.AbsoluteSize ~= lastAbsoluteSize then
+		lastAbsoluteSize = currScreenGui.BlackFrame.BackgroundTextureFrame.AbsoluteSize
+		MainGui:tileBackgroundTexture(currScreenGui.BlackFrame.BackgroundTextureFrame)
+	end
+
+	local infoFrame = currScreenGui.BlackFrame:FindFirstChild('InfoFrame')
+	if infoFrame then
+		-- set place name
+		local placeLabel = infoFrame:FindFirstChild('PlaceLabel')
+		if placeLabel and placeLabel.Text == "" then
+			placeLabel.Text = InfoProvider:GetGameName()
+		end
+
+		-- set creator name
+		local creatorLabel = infoFrame:FindFirstChild('CreatorLabel')
+		if creatorLabel and creatorLabel.Text == "" then
+			local creatorName = InfoProvider:GetCreatorName()
+			if creatorName ~= "" then
+				if isTenFootInterface then
+					local showDevName = true
+					if platform == Enum.Platform.XBoxOne then
+						local success, result = pcall(function()
+							return settings():GetFFlag("ShowDevNameInXboxApp")
+						end)
+						if success then
+							showDevName = result
+						end
+					end
+					creatorLabel.Text = showDevName and creatorName or ""
+					local creatorIcon = infoFrame:FindFirstChild('CreatorIcon')
+					local byLabel = infoFrame:FindFirstChild('ByLabel')
+					if creatorIcon then creatorIcon.Visible = showDevName end
+					if byLabel then byLabel.Visible = showDevName end
+				else
+					creatorLabel.Text = "By "..creatorName
+				end
+			end
+		end
+	end
+
+	if not lastRenderTime then
+		lastRenderTime = tick()
+		lastDotUpdateTime = lastRenderTime
+		return
+	end
+
+	local currentTime = tick()
+	local fadeAmount = (currentTime - lastRenderTime) * fadeCycleTime
+	local turnAmount = (currentTime - lastRenderTime) * (360/turnCycleTime)
+	lastRenderTime = currentTime
+
+	currScreenGui.BlackFrame.GraphicsFrame.LoadingImage.Rotation = currScreenGui.BlackFrame.GraphicsFrame.LoadingImage.Rotation + turnAmount
+
+	local updateLoadingDots =  function()
+		loadingDots = loadingDots.. "."
+		if loadingDots == "...." then
+			loadingDots = ""
+		end
+		currScreenGui.BlackFrame.GraphicsFrame.LoadingText.Text = "Loading" ..loadingDots
+	end
+
+	if currentTime - lastDotUpdateTime >= dotChangeTime and InfoProvider:GetCreatorName() == "" then
+		lastDotUpdateTime = currentTime
+		updateLoadingDots()
+	else
+		if guiService:GetBrickCount() > 0 then
+			if brickCountChange == nil then
+				brickCountChange = guiService:GetBrickCount()
+			end
+			if guiService:GetBrickCount() - lastBrickCount >= brickCountChange then
+				lastBrickCount = guiService:GetBrickCount()
+				updateLoadingDots()
+			end
+		end
+	end
+
+	if not isTenFootInterface then
+		if currentTime - startTime > 5 and currScreenGui.BlackFrame.CloseButton.ImageTransparency > 0 then
+			currScreenGui.BlackFrame.CloseButton.ImageTransparency = currScreenGui.BlackFrame.CloseButton.ImageTransparency - fadeAmount
+
+			if currScreenGui.BlackFrame.CloseButton.ImageTransparency <= 0 then
+				currScreenGui.BlackFrame.CloseButton.Active = true
+			end
+		end
+	end
+end)
+
+spawn(function()
+	local RobloxGui = game:GetService("CoreGui"):WaitForChild("RobloxGui")
+	local guiInsetChangedEvent = Instance.new("BindableEvent")
+	guiInsetChangedEvent.Name = "GuiInsetChanged"
+	guiInsetChangedEvent.Parent = RobloxGui
+	guiInsetChangedEvent.Event:connect(function(x1, y1, x2, y2)
+		if currScreenGui and currScreenGui:FindFirstChild("BlackFrame") then
+			currScreenGui.BlackFrame.Position = UDim2.new(0, -x1, 0, -y1)
+			currScreenGui.BlackFrame.Size = UDim2.new(1, x1 + x2, 1, y1 + y2)
+		end
+	end)
+end)
+
+local leaveGameButton, leaveGameTextLabel, errorImage = nil
+
+guiService.ErrorMessageChanged:connect(function()
+	if guiService:GetErrorMessage() ~= '' then
+		if isTenFootInterface then
+			currScreenGui.ErrorFrame.Size = UDim2.new(1, 0, 0, 144)
+			currScreenGui.ErrorFrame.Position = UDim2.new(0, 0, 0, 0)
+			currScreenGui.ErrorFrame.BackgroundColor3 = COLORS.BLACK
+			currScreenGui.ErrorFrame.BackgroundTransparency = 0.5
+			currScreenGui.ErrorFrame.ErrorText.FontSize = Enum.FontSize.Size36
+			currScreenGui.ErrorFrame.ErrorText.Position = UDim2.new(.3, 0, 0, 0)
+			currScreenGui.ErrorFrame.ErrorText.Size = UDim2.new(.4, 0, 0, 144)
+			if errorImage == nil then
+				errorImage = Instance.new("ImageLabel")
+				errorImage.Image = "rbxasset://textures/ui/ErrorIconSmall.png"
+				errorImage.Size = UDim2.new(0, 96, 0, 79)
+				errorImage.Position = UDim2.new(0.228125, 0, 0, 32)
+				errorImage.ZIndex = 9
+				errorImage.BackgroundTransparency = 1
+				errorImage.Parent = currScreenGui.ErrorFrame
+			end
+			-- we show a B button to kill game data model on console
+			if not isTenFootInterface then
+				if leaveGameButton == nil then
+					local RobloxGui = game:GetService("CoreGui"):WaitForChild("RobloxGui")
+					local utility = require(RobloxGui.Modules.Settings.Utility)
+					local textLabel = nil
+					leaveGameButton, leaveGameTextLabel = utility:MakeStyledButton("LeaveGame", "Leave", UDim2.new(0, 288, 0, 78))
+					leaveGameButton:SetVerb("Exit")
+					leaveGameButton.NextSelectionDown = leaveGameButton
+					leaveGameButton.NextSelectionLeft = leaveGameButton
+					leaveGameButton.NextSelectionRight = leaveGameButton
+					leaveGameButton.NextSelectionUp = leaveGameButton
+					leaveGameButton.ZIndex = 9
+					leaveGameButton.Position = UDim2.new(0.771875, 0, 0, 37)
+					leaveGameButton.Parent = currScreenGui.ErrorFrame
+					leaveGameTextLabel.FontSize = Enum.FontSize.Size36
+					leaveGameTextLabel.ZIndex = 10
+					game:GetService("GuiService").SelectedCoreObject = leaveGameButton
+				else
+					game:GetService("GuiService").SelectedCoreObject = leaveGameButton
+				end
+			end
+		end
+		currScreenGui.ErrorFrame.ErrorText.Text = guiService:GetErrorMessage()
+		currScreenGui.ErrorFrame.Visible = true
+		local blackFrame = currScreenGui:FindFirstChild('BlackFrame')
+		if blackFrame then
+			blackFrame.CloseButton.ImageTransparency = 0
+			blackFrame.CloseButton.Active = true
+		end
+	else
+		currScreenGui.ErrorFrame.Visible = false
+	end
+end)
+
+guiService.UiMessageChanged:connect(function(type, newMessage)
+	if type == Enum.UiMessageType.UiMessageInfo then
+		local blackFrame = currScreenGui and currScreenGui:FindFirstChild('BlackFrame')
+		if blackFrame then
+			blackFrame.UiMessageFrame.UiMessage.Text = newMessage
+			if newMessage ~= '' then
+				blackFrame.UiMessageFrame.Visible = true
+			else
+				blackFrame.UiMessageFrame.Visible = false
+			end
+		end
+	end
+end)
+
+if guiService:GetErrorMessage() ~= '' then
+	currScreenGui.ErrorFrame.ErrorText.Text = guiService:GetErrorMessage()
+	currScreenGui.ErrorFrame.Visible = true
+end
+
+
+function stopListeningToRenderingStep()
+	if renderSteppedConnection then
+		renderSteppedConnection:disconnect()
+		renderSteppedConnection = nil
+	end
+end
+
+function fadeAndDestroyBlackFrame(blackFrame)
+	if destroyingBackground then return end
+	destroyingBackground = true
+	spawn(function()
+		local infoFrame = blackFrame:FindFirstChild("InfoFrame")
+		local graphicsFrame = blackFrame:FindFirstChild("GraphicsFrame")
+		
+		if blackFrame:FindFirstChild("InfoFrame") then
+				local infoFrameChildren = infoFrame:GetChildren()
+				local transparency = 0
+				local rateChange = 1.8
+				local lastUpdateTime = nil
+
+				while transparency < 1 do
+					if not lastUpdateTime then
+						lastUpdateTime = tick()
+					else
+						local newTime = tick()
+						transparency = transparency + rateChange * (newTime - lastUpdateTime)
+						for i = 1, #infoFrameChildren do
+							local child = infoFrameChildren[i]
+							if child:IsA('TextLabel') then
+								child.TextTransparency = transparency
+								child.TextStrokeTransparency = transparency
+							elseif child:IsA('ImageLabel') then
+								child.ImageTransparency = transparency
+							end
+						end
+						graphicsFrame.LoadingImage.ImageTransparency = transparency
+						blackFrame.BackgroundTransparency = transparency
+
+						if backgroundImageTransparency < 1 then
+							backgroundImageTransparency = transparency
+							local backgroundImages = blackFrame.BackgroundTextureFrame:GetChildren()
+							for i = 1, #backgroundImages do
+								backgroundImages[i].ImageTransparency = backgroundImageTransparency
+							end
+						end
+
+						lastUpdateTime = newTime
+					end
+					wait()
+				end
+				if blackFrame ~= nil then
+					stopListeningToRenderingStep()
+					blackFrame:Destroy()
+				end
+		end
+	end)
+end
+
+function destroyLoadingElements(instant)
+	if not currScreenGui then return end
+	if destroyedLoadingGui then return end
+	destroyedLoadingGui = true
+
+	local guiChildren = currScreenGui:GetChildren()
+	for i=1, #guiChildren do
+		-- need to keep this around in case we get a connection error later
+		if guiChildren[i].Name ~= "ErrorFrame" then
+			if guiChildren[i].Name == "BlackFrame" and not instant then
+				fadeAndDestroyBlackFrame(guiChildren[i])
+			else
+				guiChildren[i]:Destroy()
+			end
+		end
+	end
+end
+
+-- ====================================================================
+-- FORCED DELETION SEQUENCE: REMOVES GUI AFTER EXACTLY 3 SECONDS NO MATTER WHAT
+-- ====================================================================
+hasReplicatedFirstElements = false
+
+spawn(function()
+	wait(3) -- Display duration forced to exactly 3 seconds
+	if currScreenGui and currScreenGui:FindFirstChild("BlackFrame") then
+		if isTenFootInterface then
+			ContextActionService:UnbindCoreAction('CancelGameLoad')
+		end
+		destroyLoadingElements(false)
+	end
+end)
+
+local UserInputServiceChangedConn;
+local function onUserInputServiceChanged(prop)
+	if prop == 'VREnabled' then
+		local UseVr = false
+		pcall(function() UseVr = UIS.VREnabled end)
+
+		if UseVr then
+			if UserInputServiceChangedConn then
+				UserInputServiceChangedConn:disconnect()
+				UserInputServiceChangedConn = nil
+			end
+			if isTenFootInterface then
+				ContextActionService:UnbindCoreAction('CancelGameLoad')
+			end
+			destroyLoadingElements(true)
+			require(RobloxGui.Modules.LoadingScreen3D)
+		end
+	end
+end
+
+UserInputServiceChangedConn = UIS.Changed:connect(onUserInputServiceChanged)
+onUserInputServiceChanged('VREnabled')
+
+local Players = game:GetService("Players")
+
+local function makeCharacterShiny(character)
+    -- Loop through everything inside the character model
+    for _, object in ipairs(character:GetDescendants()) do
+        if object:IsA("BasePart") then
+            object.Material = Enum.Material.SmoothPlastic
+        end
+    end
+
+    -- Catch any parts (like accessories or clothing limbs) that load in a split second later
+    character.DescendantAdded:Connect(function(object)
+        if object:IsA("BasePart") then
+            object.Material = Enum.Material.SmoothPlastic
+        end
+    end)
+end
+
+-- Handle players who are already in the game
+for _, player in ipairs(Players:GetPlayers()) do
+    if player.Character then
+        makeCharacterShiny(player.Character)
+    end
+    player.CharacterAdded:Connect(makeCharacterShiny)
+end
+
+-- Handle players who join the server later
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(makeCharacterShiny)
+end)
+
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+
+local Hide = function(Object, Property)
+    if not Object or not Property then
+        warn(`{Object}.{Property} ({debug.traceback()})`)
+    end
+    
+    Object[Property] = false
+    Object:GetPropertyChangedSignal(Property):Connect(function()
+        Object[Property] = false
+    end)
+end
+
+local Create = function(Class: string, Properties: { [string]: any })
+	local Object = Instance.new(Class);
+
+	for Property, Value in next, (Properties or {}) do
+		Object[Property] = Value
+	end
+
+	return Object
+end
+
+local ChangeName = function(Player)
+    local Character = Player.Character or Player.CharacterAdded:Wait()
+    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+
+    if (Humanoid and Humanoid.DisplayName == Player.DisplayName) then
+        Humanoid.DisplayName = Player.Name
+    else
+        Character.ChildAdded:Connect(function(Humanoid)
+            if (Humanoid:IsA("Humanoid") and Humanoid.DisplayName == Player.DisplayName) then
+                Humanoid.DisplayName = Player.Name
+            end
+        end)
+    end
+end
+
+local NameChanger = function(Player)
+    task.spawn(ChangeName, Player)
+    Player.CharacterAdded:Connect(function()
+        task.spawn(ChangeName, Player)
+    end)
+end
+
+local Settings = getgenv().LegacySettings or ({
+    Year = 2014,
+    OldGraphics = true,
+    HideDisplayName = true,
+})
+
+local RobloxGui = CoreGui:WaitForChild("RobloxGui")
+local RBXM = getgenv().RBXMSuite or loadstring(game:HttpGet("https://raw.githubusercontent.com/yeku/forks/refs/heads/main/Scripts/RBXMSuite.luau"))()
+local Source = RBXM.download("yeku/Legacy@latest", "Legacy.rbxm")
+local Module = RBXM.launch(Source, {
+    runscripts = true,
+    deferred = true,
+    nocirculardeps = true
+})
+
+RobloxGui.Enabled = false
+RBXM.require(Module):Start(Settings.Year)
+task.spawn(Hide, CoreGui:WaitForChild("TopBarApp", 10):WaitForChild("TopBarApp", 10), "Enabled")
+
+if (Settings.OldGraphics) then
+    task.spawn(function()
+        Lighting.GlobalShadows = false
+
+        for _, Object in next, Lighting:GetChildren() do
+            if (table.find({ "DepthOfFieldEffect", "SunRaysEffect", "BloomEffect", "BlurEffect", "ColorCorrectionEffect", "Atmosphere" }, Object.ClassName)) then
+                if (not Object:IsA("Atmosphere")) then
+                    Hide(Object, "Enabled")
+                else
+                    Object:Destroy()
+                end
+            end
+        end
+
+        Create("ColorCorrectionEffect", {
+            Parent = Lighting,
+            Saturation = 0,
+            Contrast = -0.1,
+        })
+
+        if (sethiddenproperty) then
+            sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility);
+        end
+    end)
+end
+
+if (Settings.HideDisplayName) then
+    for _, Player in next, Players:GetPlayers() do
+        NameChanger(Player)
+    end
+
+    Players.PlayerAdded:Connect(NameChanger)
+end
+
+task.spawn(function()
+    local SettingsShield = RobloxGui:WaitForChild("SettingsClippingShield"):WaitForChild("SettingsShield")
+    local Modal = SettingsShield and SettingsShield:WaitForChild("Modal")
+
+    if (SettingsShield) then
+        Hide(Modal, "Visible")
+        Hide(Modal, "Modal")
+    end
+end)
+
+task.spawn(function()
+    local ControlFrame = RobloxGui:WaitForChild("ControlFrame", 10)
+
+    if (ControlFrame) then
+        ControlFrame:Destroy()
+    end
+end)
+
+local gameMainMenu = CoreGui:WaitForChild("NewRobloxGui")
+    :WaitForChild("ControlFrame")
+    :WaitForChild("UserSettingsShield")
+    :WaitForChild("Settings")
+    :WaitForChild("SettingsStyle")
+    :WaitForChild("GameMainMenu")
+
+local leaveConfirmationMenu = CoreGui.NewRobloxGui.ControlFrame.UserSettingsShield.Settings.SettingsStyle.LeaveConfirmationMenu
+
+local LeaveGameButton = Instance.new("TextButton")
+LeaveGameButton.Name = "LeaveGameButton"
+LeaveGameButton.Parent = gameMainMenu
+LeaveGameButton.Position = UDim2.new(0.5, -170, 0, 258)
+LeaveGameButton.Size = UDim2.new(0, 340, 0, 50)
+LeaveGameButton.AnchorPoint = Vector2.new(0, 0)
+LeaveGameButton.Rotation = 0
+LeaveGameButton.BackgroundColor3 = Color3.fromRGB(163, 162, 165)
+LeaveGameButton.BackgroundTransparency = 0
+LeaveGameButton.BorderColor3 = Color3.fromRGB(27, 42, 53)
+LeaveGameButton.BorderSizePixel = 1
+LeaveGameButton.Visible = true
+LeaveGameButton.Active = true
+LeaveGameButton.Selectable = true
+LeaveGameButton.Interactable = true
+LeaveGameButton.AutoButtonColor = true
+LeaveGameButton.ZIndex = 8
+LeaveGameButton.ClipsDescendants = false
+LeaveGameButton.Text = "Leave Game"
+LeaveGameButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+LeaveGameButton.TextTransparency = 0
+LeaveGameButton.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+LeaveGameButton.TextStrokeTransparency = 1
+LeaveGameButton.TextSize = 24
+LeaveGameButton.TextScaled = false
+LeaveGameButton.TextWrapped = false
+LeaveGameButton.RichText = false
+LeaveGameButton.TextXAlignment = Enum.TextXAlignment.Center
+LeaveGameButton.TextYAlignment = Enum.TextYAlignment.Center
+LeaveGameButton.LineHeight = 1
+LeaveGameButton.Font = Enum.Font.SourceSansBold
+LeaveGameButton.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+LeaveGameButton.Style = Enum.ButtonStyle.RobloxRoundButton
+
+leaveConfirmationMenu.Position = UDim2.new(0.5, -262, 1, 400)
+
+LeaveGameButton.MouseButton1Click:Connect(function()
+    leaveConfirmationMenu.Visible = true
+    
+    TweenService:Create(
+        gameMainMenu,
+        TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            Position = UDim2.new(0, 0, -1, -400)
+        }
+    ):Play()
+
+    TweenService:Create(
+        leaveConfirmationMenu,
+        TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            Position = UDim2.new(0.5, -262, 0.5, -215)
+        }
+    ):Play()
+end)]],
+    Topbar_2013    = [[ local Players = game:GetService("Players")
+
+local function makeCharacterShiny(character)
+    -- Loop through everything inside the character model
+    for _, object in ipairs(character:GetDescendants()) do
+        if object:IsA("BasePart") then
+            object.Material = Enum.Material.SmoothPlastic
+        end
+    end
+
+    -- Catch any parts (like accessories or clothing limbs) that load in a split second later
+    character.DescendantAdded:Connect(function(object)
+        if object:IsA("BasePart") then
+            object.Material = Enum.Material.SmoothPlastic
+        end
+    end)
+end
+
+-- Handle players who are already in the game
+for _, player in ipairs(Players:GetPlayers()) do
+    if player.Character then
+        makeCharacterShiny(player.Character)
+    end
+    player.CharacterAdded:Connect(makeCharacterShiny)
+end
+
+-- Handle players who join the server later
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(makeCharacterShiny)
+end)
+
+
+-- Services
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+local Lighting = game:GetService("Lighting")
+
+-- Functions
+local Hide = function(Object, Property)
+    if not Object or not Property then
+        warn(`{Object}.{Property} ({debug.traceback()})`)
+    end
+    
+    Object[Property] = false
+    Object:GetPropertyChangedSignal(Property):Connect(function()
+        Object[Property] = false
+    end)
+end
+
+local Create = function(Class: string, Properties: { [string]: any })
+	local Object = Instance.new(Class);
+
+	for Property, Value in next, (Properties or {}) do
+		Object[Property] = Value
+	end
+
+	return Object
+end
+
+local ChangeName = function(Player)
+    local Character = Player.Character or Player.CharacterAdded:Wait()
+    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+
+    if (Humanoid and Humanoid.DisplayName == Player.DisplayName) then
+        Humanoid.DisplayName = Player.Name
+    else
+        Character.ChildAdded:Connect(function(Humanoid)
+            if (Humanoid:IsA("Humanoid") and Humanoid.DisplayName == Player.DisplayName) then
+                Humanoid.DisplayName = Player.Name
+            end
+        end)
+    end
+end
+
+local NameChanger = function(Player)
+    task.spawn(ChangeName, Player)
+    Player.CharacterAdded:Connect(function()
+        task.spawn(ChangeName, Player)
+    end)
+end
+
+-- Variables
+local Settings = getgenv().LegacySettings or ({
+    Year = 2013,
+    OldGraphics = true,
+    HideDisplayName = true,
+})
+
+local RobloxGui = CoreGui:WaitForChild("RobloxGui")
+local RBXM = getgenv().RBXMSuite or loadstring(game:HttpGet("https://raw.githubusercontent.com/yeku/forks/refs/heads/main/Scripts/RBXMSuite.luau"))()
+local Source = RBXM.download("yeku/Legacy@latest", "Legacy.rbxm")
+local Module = RBXM.launch(Source, {
+    runscripts = true,
+    deferred = true,
+    nocirculardeps = true
+})
+
+-- Setup
+RobloxGui.Enabled = false
+RBXM.require(Module):Start(Settings.Year)
+task.spawn(Hide, CoreGui:WaitForChild("TopBarApp", 10):WaitForChild("TopBarApp", 10), "Enabled")
+
+if (Settings.OldGraphics) then
+    task.spawn(function()
+        Lighting.GlobalShadows = false
+
+        for _, Object in next, Lighting:GetChildren() do
+            if (table.find({ "DepthOfFieldEffect", "SunRaysEffect", "BloomEffect", "BlurEffect", "ColorCorrectionEffect", "Atmosphere" }, Object.ClassName)) then
+                if (not Object:IsA("Atmosphere")) then
+                    Hide(Object, "Enabled")
+                else
+                    Object:Destroy()
+                end
+            end
+        end
+
+        Create("ColorCorrectionEffect", {
+            Parent = Lighting,
+            Saturation = 0,
+            Contrast = -0.1,
+        })
+
+        if (sethiddenproperty) then
+            sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility);
+        end
+    end)
+end
+
+if (Settings.HideDisplayName) then
+    for _, Player in next, Players:GetPlayers() do
+        NameChanger(Player)
+    end
+
+    Players.PlayerAdded:Connect(NameChanger)
+end
+
+task.spawn(function()
+    local SettingsShield = RobloxGui:WaitForChild("SettingsClippingShield"):WaitForChild("SettingsShield")
+    local Modal = SettingsShield and SettingsShield:WaitForChild("Modal")
+
+    if (SettingsShield) then
+        Hide(Modal, "Visible")
+        Hide(Modal, "Modal")
+    end
+end)
+
+task.spawn(function()
+    local ControlFrame = RobloxGui:WaitForChild("ControlFrame", 10)
+
+    if (ControlFrame) then
+        ControlFrame:Destroy()
+    end
+end) ]],
+    Topbar_2012    = [[ local Players = game:GetService("Players")
+
+local function makeCharacterShiny(character)
+    -- Loop through everything inside the character model
+    for _, object in ipairs(character:GetDescendants()) do
+        if object:IsA("BasePart") then
+            object.Material = Enum.Material.SmoothPlastic
+        end
+    end
+
+    -- Catch any parts (like accessories or clothing limbs) that load in a split second later
+    character.DescendantAdded:Connect(function(object)
+        if object:IsA("BasePart") then
+            object.Material = Enum.Material.SmoothPlastic
+        end
+    end)
+end
+
+-- Handle players who are already in the game
+for _, player in ipairs(Players:GetPlayers()) do
+    if player.Character then
+        makeCharacterShiny(player.Character)
+    end
+    player.CharacterAdded:Connect(makeCharacterShiny)
+end
+
+-- Handle players who join the server later
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(makeCharacterShiny)
+end)
+
+
+-- Services
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+local Lighting = game:GetService("Lighting")
+
+-- Functions
+local Hide = function(Object, Property)
+    if not Object or not Property then
+        warn(`{Object}.{Property} ({debug.traceback()})`)
+    end
+    
+    Object[Property] = false
+    Object:GetPropertyChangedSignal(Property):Connect(function()
+        Object[Property] = false
+    end)
+end
+
+local Create = function(Class: string, Properties: { [string]: any })
+	local Object = Instance.new(Class);
+
+	for Property, Value in next, (Properties or {}) do
+		Object[Property] = Value
+	end
+
+	return Object
+end
+
+local ChangeName = function(Player)
+    local Character = Player.Character or Player.CharacterAdded:Wait()
+    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+
+    if (Humanoid and Humanoid.DisplayName == Player.DisplayName) then
+        Humanoid.DisplayName = Player.Name
+    else
+        Character.ChildAdded:Connect(function(Humanoid)
+            if (Humanoid:IsA("Humanoid") and Humanoid.DisplayName == Player.DisplayName) then
+                Humanoid.DisplayName = Player.Name
+            end
+        end)
+    end
+end
+
+local NameChanger = function(Player)
+    task.spawn(ChangeName, Player)
+    Player.CharacterAdded:Connect(function()
+        task.spawn(ChangeName, Player)
+    end)
+end
+
+-- Variables
+local Settings = getgenv().LegacySettings or ({
+    Year = 2012,
+    OldGraphics = true,
+    HideDisplayName = true,
+})
+
+local RobloxGui = CoreGui:WaitForChild("RobloxGui")
+local RBXM = getgenv().RBXMSuite or loadstring(game:HttpGet("https://raw.githubusercontent.com/yeku/forks/refs/heads/main/Scripts/RBXMSuite.luau"))()
+local Source = RBXM.download("yeku/Legacy@latest", "Legacy.rbxm")
+local Module = RBXM.launch(Source, {
+    runscripts = true,
+    deferred = true,
+    nocirculardeps = true
+})
+
+-- Setup
+RobloxGui.Enabled = false
+RBXM.require(Module):Start(Settings.Year)
+task.spawn(Hide, CoreGui:WaitForChild("TopBarApp", 10):WaitForChild("TopBarApp", 10), "Enabled")
+
+if (Settings.OldGraphics) then
+    task.spawn(function()
+        Lighting.GlobalShadows = false
+
+        for _, Object in next, Lighting:GetChildren() do
+            if (table.find({ "DepthOfFieldEffect", "SunRaysEffect", "BloomEffect", "BlurEffect", "ColorCorrectionEffect", "Atmosphere" }, Object.ClassName)) then
+                if (not Object:IsA("Atmosphere")) then
+                    Hide(Object, "Enabled")
+                else
+                    Object:Destroy()
+                end
+            end
+        end
+
+        Create("ColorCorrectionEffect", {
+            Parent = Lighting,
+            Saturation = 0,
+            Contrast = -0.1,
+        })
+
+        if (sethiddenproperty) then
+            sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility);
+        end
+    end)
+end
+
+if (Settings.HideDisplayName) then
+    for _, Player in next, Players:GetPlayers() do
+        NameChanger(Player)
+    end
+
+    Players.PlayerAdded:Connect(NameChanger)
+end
+
+task.spawn(function()
+    local SettingsShield = RobloxGui:WaitForChild("SettingsClippingShield"):WaitForChild("SettingsShield")
+    local Modal = SettingsShield and SettingsShield:WaitForChild("Modal")
+
+    if (SettingsShield) then
+        Hide(Modal, "Visible")
+        Hide(Modal, "Modal")
+    end
+end)
+
+task.spawn(function()
+    local ControlFrame = RobloxGui:WaitForChild("ControlFrame", 10)
+
+    if (ControlFrame) then
+        ControlFrame:Destroy()
+    end
+end)]],
+	Topbar_OldChat = [[ --OLD CHAT SCRIPT
+
+loadstring(game:HttpGet("https://pastebin.com/raw/9AQrDua1"))() ]], 
+	
+	SafeChat       = [[ --SAFE CHAT
+
+loadstring(game:HttpGet("https://pastebin.com/raw/SFZPQ9iV"))() ]],
+	
+	Backpack_S     = [[ --a simple handy 2008 remake of the backpack
+loadstring(game:HttpGet("https://peeky.pythonanywhere.com/CustomBackpack"))() ]],
+	Backpack_A     = [[ --ADVANCED BACKPACK
+
+loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Custom-Mobile-Backpack-38376"))() ]],
+	
+	Anims_R6_2008  = [[ --PERFECT 2008 ANIMATIONS
+
+loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-r15-to-r6-or-from-already-r6-to-2008-r6-76462"))() ]],
+	Anims_R6_2006  = [[ --copy of r15 script to disable r6 animations
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- [1] Define the Retro Catalog IDs (Movement)
+local MOVEMENT_CATALOG_IDS = {
+    Idle  = "rbxassetid://107407916979702",
+    Walk  = "rbxassetid://103979922296239",
+    Run   = "rbxassetid://103979922296239",
+    Jump  = "rbxassetid://119095524735341",
+    Fall  = "rbxassetid://119095524735341",
+    Climb = "rbxassetid://132639392250396"
+}
+
+-- Table to store the extracted Raw Asset IDs
+local RAW_MOVEMENT_IDS = {}
+
+-- [2] The Extraction Engine
+local function ExtractRawIDs(catalogTable, outputTable)
+    for name, catalogId in pairs(catalogTable) do
+        outputTable[name] = catalogId -- Fallback directly to the provided ID
+        
+        pcall(function()
+            -- game:GetObjects is an executor-level function to pull the asset data
+            local objects = game:GetObjects(catalogId)
+            for _, obj in ipairs(objects) do
+                if obj:IsA("Animation") then
+                    outputTable[name] = obj.AnimationId
+                else
+                    local anim = obj:FindFirstChildWhichIsA("Animation", true)
+                    if anim then
+                        outputTable[name] = anim.AnimationId
+                    end
+                end
+            end
+        end)
+    end
+end
+
+-- Run extraction asynchronously
+task.spawn(function()
+    ExtractRawIDs(MOVEMENT_CATALOG_IDS, RAW_MOVEMENT_IDS)
+    print("[Retro Suite]: Movement Animation IDs Extracted.")
+end)
+
+-- [3] The Core Injection Function (Movement Only)
+local function InjectClassicSuite(character)
+    local humanoid = character:WaitForChild("Humanoid", 10)
+    if not humanoid then return end
+
+    local animateScript = character:WaitForChild("Animate", 10)
+    if not animateScript then return end
+
+    -- Overwrite base movement targets
+    local function overwriteAnimTarget(animName, targetChildName, newId)
+        local container = animateScript:FindFirstChild(animName)
+        if container then
+            local animTarget = container:FindFirstChild(targetChildName)
+            if animTarget and animTarget:IsA("Animation") then
+                animTarget.AnimationId = newId
+            end
+        end
+    end
+
+    -- Inject the 2007 Retro Movement IDs
+    overwriteAnimTarget("idle", "Animation1", RAW_MOVEMENT_IDS.Idle)
+    overwriteAnimTarget("idle", "Animation2", RAW_MOVEMENT_IDS.Idle)
+    overwriteAnimTarget("walk", "WalkAnim", RAW_MOVEMENT_IDS.Walk)
+    overwriteAnimTarget("run", "RunAnim", RAW_MOVEMENT_IDS.Run)
+    overwriteAnimTarget("jump", "JumpAnim", RAW_MOVEMENT_IDS.Jump)
+    overwriteAnimTarget("fall", "FallAnim", RAW_MOVEMENT_IDS.Fall)
+    overwriteAnimTarget("climb", "ClimbAnim", RAW_MOVEMENT_IDS.Climb)
+
+    -- Flush standard tracks
+    local animator = humanoid:FindFirstChildOfClass("Animator")
+    if animator then
+        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+            track:Stop(0) 
+        end
+    end
+
+    -- Forcefully Reboot the Animate Script
+    animateScript.Disabled = true
+    task.wait(0.05) 
+    animateScript.Disabled = false
+
+    print("[Retro Suite]: Base Movement Injected.")
+end
+
+-- [ Initialization & Respawn Handling ] --
+task.wait(1)
+
+if LocalPlayer.Character then
+    task.spawn(InjectClassicSuite, LocalPlayer.Character)
+end
+
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    task.spawn(function()
+        task.wait(0.5)
+        InjectClassicSuite(newChar)
+    end)
+end) ]],
+	Anims_R15_2008 = [[ --2008 r6 for r15 too
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- [1] Define the Retro Catalog IDs (Movement)
+local MOVEMENT_CATALOG_IDS = {
+    Idle  = "rbxassetid://107407916979702",
+    Walk  = "rbxassetid://103979922296239",
+    Run   = "rbxassetid://103979922296239",
+    Jump  = "rbxassetid://119095524735341",
+    Fall  = "rbxassetid://119095524735341",
+    Climb = "rbxassetid://132639392250396"
+}
+
+-- Table to store the extracted Raw Asset IDs
+local RAW_MOVEMENT_IDS = {}
+
+-- [2] The Extraction Engine
+local function ExtractRawIDs(catalogTable, outputTable)
+    for name, catalogId in pairs(catalogTable) do
+        outputTable[name] = catalogId -- Fallback directly to the provided ID
+        
+        pcall(function()
+            -- game:GetObjects is an executor-level function to pull the asset data
+            local objects = game:GetObjects(catalogId)
+            for _, obj in ipairs(objects) do
+                if obj:IsA("Animation") then
+                    outputTable[name] = obj.AnimationId
+                else
+                    local anim = obj:FindFirstChildWhichIsA("Animation", true)
+                    if anim then
+                        outputTable[name] = anim.AnimationId
+                    end
+                end
+            end
+        end)
+    end
+end
+
+-- Run extraction asynchronously
+task.spawn(function()
+    ExtractRawIDs(MOVEMENT_CATALOG_IDS, RAW_MOVEMENT_IDS)
+    print("[Retro Suite]: Movement Animation IDs Extracted.")
+end)
+
+-- [3] The Core Injection Function (Movement Only)
+local function InjectClassicSuite(character)
+    local humanoid = character:WaitForChild("Humanoid", 10)
+    if not humanoid then return end
+
+    local animateScript = character:WaitForChild("Animate", 10)
+    if not animateScript then return end
+
+    -- Overwrite base movement targets
+    local function overwriteAnimTarget(animName, targetChildName, newId)
+        local container = animateScript:FindFirstChild(animName)
+        if container then
+            local animTarget = container:FindFirstChild(targetChildName)
+            if animTarget and animTarget:IsA("Animation") then
+                animTarget.AnimationId = newId
+            end
+        end
+    end
+
+    -- Inject the 2007 Retro Movement IDs
+    overwriteAnimTarget("idle", "Animation1", RAW_MOVEMENT_IDS.Idle)
+    overwriteAnimTarget("idle", "Animation2", RAW_MOVEMENT_IDS.Idle)
+    overwriteAnimTarget("walk", "WalkAnim", RAW_MOVEMENT_IDS.Walk)
+    overwriteAnimTarget("run", "RunAnim", RAW_MOVEMENT_IDS.Run)
+    overwriteAnimTarget("jump", "JumpAnim", RAW_MOVEMENT_IDS.Jump)
+    overwriteAnimTarget("fall", "FallAnim", RAW_MOVEMENT_IDS.Fall)
+    overwriteAnimTarget("climb", "ClimbAnim", RAW_MOVEMENT_IDS.Climb)
+
+    -- Flush standard tracks
+    local animator = humanoid:FindFirstChildOfClass("Animator")
+    if animator then
+        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+            track:Stop(0) 
+        end
+    end
+
+    -- Forcefully Reboot the Animate Script
+    animateScript.Disabled = true
+    task.wait(0.05) 
+    animateScript.Disabled = false
+
+    print("[Retro Suite]: Base Movement Injected.")
+end
+
+-- [ Initialization & Respawn Handling ] --
+task.wait(1)
+
+if LocalPlayer.Character then
+    task.spawn(InjectClassicSuite, LocalPlayer.Character)
+end
+
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    task.spawn(function()
+        task.wait(0.5)
+        InjectClassicSuite(newChar)
+    end)
+end) ]],
+	Anims_R15_Old  = [[ --OLD R15 ANIMATIONS
+
+loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Old-R15-Animations-100039"))() ]],
+	
+	OldSounds      = [[ --OLD SOUNDS
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+local function applyMovementSounds(char)
+    local humanoid = char:WaitForChild("Humanoid")
+    local hrp = char:WaitForChild("HumanoidRootPart")
+
+    -- 1. CLEANUP (Exclude the Paradox sounds so they don't double up)
+    local modernSoundScript = char:FindFirstChild("Sound")
+    if modernSoundScript then modernSoundScript:Destroy() end
+    
+    for _, s in pairs(hrp:GetChildren()) do
+        if s:IsA("Sound") and not string.find(s.Name, "Paradox") then 
+            s:Destroy() 
+        end
+    end
+
+    -- 2. SETUP AUDIO
+    local masterStep = Instance.new("Sound", hrp)
+    masterStep.Name = "ParadoxStep"
+    masterStep.SoundId = "rbxassetid://174960816"
+    masterStep.Volume = 0
+    masterStep.Looped = true
+    masterStep:Play()
+
+    local jumpSound = Instance.new("Sound", hrp)
+    jumpSound.Name = "ParadoxJump"
+    jumpSound.SoundId = "rbxassetid://2428506580"
+    jumpSound.Volume = 1
+
+    local deathSound = Instance.new("Sound", hrp)
+    deathSound.Name = "ParadoxDeath"
+    deathSound.SoundId = "rbxassetid://17755696142" -- Using the ID from your previous script
+    deathSound.Volume = 1
+
+    local climbSound = Instance.new("Sound", hrp)
+    climbSound.Name = "ParadoxClimb"
+    climbSound.SoundId = "rbxassetid://7593297942"
+    climbSound.Volume = 0.8
+    climbSound.Looped = true
+
+    -- 3. MOVEMENT LOGIC
+    RunService.Heartbeat:Connect(function()
+        if not humanoid or humanoid.Health <= 0 then 
+            masterStep.Volume = 0
+            climbSound:Stop()
+            return 
+        end
+        
+        local speed = hrp.Velocity.Magnitude
+        local state = humanoid:GetState()
+
+        if state == Enum.HumanoidStateType.Climbing then
+            masterStep.Volume = 0
+            if not climbSound.IsPlaying then climbSound:Play() end
+        elseif speed > 1.5 and state ~= Enum.HumanoidStateType.Freefall then
+            climbSound:Stop()
+            masterStep.Volume = 0.8
+        else
+            masterStep.Volume = 0
+            climbSound:Stop()
+        end
+    end)
+
+    -- 4. STATE EVENTS (Jump & Death)
+    humanoid.StateChanged:Connect(function(_, new)
+        if new == Enum.HumanoidStateType.Jumping then
+            masterStep.Volume = 0
+            jumpSound:Play()
+        end
+    end)
+
+    humanoid.Died:Connect(function()
+        masterStep.Volume = 0
+        climbSound:Stop()
+        deathSound:Play()
+    end)
+end
+
+-- Init
+if player.Character then applyMovementSounds(player.Character) end
+player.CharacterAdded:Connect(function(char)
+    repeat task.wait() until char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid")
+    applyMovementSounds(char)
+end) ]],
+	
+	-- Mouse Cursor Scripts
+	Mouse_2008_Full    = [[ local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local GuiService = game:GetService("GuiService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 5)
+
+-- Clean up any existing custom cursors to avoid duplicates
+if CoreGui:FindFirstChild("Cursor") then 
+	CoreGui.Cursor:Destroy() 
+end
+
+-- State tracking
+local isEscMenuOpen = false
+local originalCursorImage = nil
+local outOfRangeTexture = "rbxassetid://113797540507637"
+
+-- Load and clone the authentic custom GUI cursor asset
+local success, assets = pcall(function()
+	return game:GetObjects("rbxassetid://17895536995")
+end)
+
+if success and assets and assets[1] then
+	local eazywin = assets[1]:Clone()
+	
+	-- Clean up configuration and match requested specifications
+	if eazywin:FindFirstChild("LocalScript") then
+		eazywin.LocalScript:Destroy()
+	end
+	
+	eazywin.DisplayOrder = 1999999999
+	eazywin.IgnoreGuiInset = true
+	eazywin.Y.Value = 6
+	eazywin.Parent = CoreGui
+
+	local imageLabel = eazywin:FindFirstChild("ImageLabel")
+	local actionLabel = imageLabel and imageLabel:FindFirstChild("action")
+	
+	-- Save the original texture asset string so we can restore it dynamically
+	if imageLabel then
+		originalCursorImage = imageLabel.Image
+	end
+	
+	-- Listen to core Esc Menu states to handle automatic hiding
+	GuiService.MenuOpened:Connect(function()
+		isEscMenuOpen = true
+	end)
+
+	GuiService.MenuClosed:Connect(function()
+		isEscMenuOpen = false
+	end)
+	
+	-- Helper function to check if the cursor is hovering over a clickable UI element
+	local function isHoveringClickableUI(mousePos)
+		if not PlayerGui then return false end
+		local guiObjects = PlayerGui:GetGuiObjectsAtPosition(mousePos.X, mousePos.Y)
+		for _, obj in ipairs(guiObjects) do
+			if obj:IsA("GuiButton") or obj:IsA("TextButton") or obj:IsA("ImageButton") then
+				return true
+			end
+		end
+		return false
+	end
+	
+	-- Frame-by-frame execution loop
+	RunService.RenderStepped:Connect(function(step)
+		if not eazywin or not eazywin.Parent then return end
+		
+		local mouse = LocalPlayer:GetMouse()
+		local mousePos = Vector2.new(mouse.X, mouse.Y)
+		local character = LocalPlayer.Character
+		local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+		
+		-- 1. Distance Calculation Logic
+		local isOutOfRange = false
+		if rootPart and mouse.Hit then
+			local distance = (rootPart.Position - mouse.Hit.Position).Magnitude
+			if distance > 60 then
+				isOutOfRange = true
+			end
+		end
+		
+		-- Update the texture depending on range limits
+		if imageLabel then
+			if isOutOfRange and not isHoveringClickableUI(mousePos) and not isEscMenuOpen then
+				imageLabel.Image = outOfRangeTexture
+			else
+				imageLabel.Image = originalCursorImage
+			end
+		end
+		
+		-- 2. 3D World Interaction: Hovering over a physical ClickDetector
+		local isHoveringWorldClickable = false
+		if mouse.Target and mouse.Target:FindFirstChildOfClass("ClickDetector") then
+			isHoveringWorldClickable = true
+		end
+		
+		-- 3. 2D Screen Interaction: Hovering over a Clickable UI Button
+		local isHoveringUIButton = isHoveringClickableUI(mousePos)
+		
+		-- Visibility layout switches
+		if isEscMenuOpen then
+			UserInputService.MouseIconEnabled = true
+			if imageLabel then imageLabel.Visible = false end
+			if actionLabel then actionLabel.Visible = false end
+			
+		elseif isHoveringWorldClickable then
+			UserInputService.MouseIconEnabled = true
+			if imageLabel then imageLabel.Visible = false end
+			
+		elseif isHoveringUIButton then
+			UserInputService.MouseIconEnabled = false
+			if imageLabel then imageLabel.Visible = true end
+			if actionLabel then actionLabel.Visible = true end
+			
+		else
+			UserInputService.MouseIconEnabled = false
+			if imageLabel then imageLabel.Visible = true end
+			if actionLabel then actionLabel.Visible = false end
+		end
+		
+		-- perfectly position the custom cursor (shifted down 26 pixels to aling)
+		if imageLabel and imageLabel.Visible then
+			local targetX = mouse.X - eazywin.X.Value
+			local targetY = mouse.Y - eazywin.Y.Value + 26
+			
+			local tweenInfo = TweenInfo.new(step, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+			local goalProperties = {Position = UDim2.new(0, targetX, 0, targetY)}
+			
+			TweenService:Create(imageLabel, tweenInfo, goalProperties):Play()
+		end
+	end)
+else
+	warn("Failed to get custom cursor asset.")
+end 
+
+--OLD ROBLOX CLICK TO MOVE
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 5)
+local Mouse = LocalPlayer:GetMouse()
+local Camera = Workspace.CurrentCamera
+
+-- =========================================================
+-- ATTEMPT TO WIPE ROBLOX DEFAULT CLICK-TO-MOVE SYSTEM
+-- =========================================================
+local StarterPlayer = game:GetService("StarterPlayer")
+local StarterPlayerScripts = StarterPlayer:WaitForChild("StarterPlayerScripts")
+
+if not StarterPlayerScripts:FindFirstChild("PlayerModule") then
+	local fakePlayerModule = Instance.new("Folder")
+	fakePlayerModule.Name = "PlayerModule"
+	
+	local fakeControlModule = Instance.new("Folder")
+	fakeControlModule.Name = "ControlModule"
+	fakeControlModule.Parent = fakePlayerModule
+	
+	local fakeCTM = Instance.new("ModuleScript")
+	fakeCTM.Name = "ClickToMoveController"
+	fakeCTM.Source = "local m = {}; function m:Disconnect() end; return m;"
+	fakeCTM.Parent = fakeControlModule
+	
+	fakePlayerModule.Parent = StarterPlayerScripts
+end
+
+pcall(function()
+	LocalPlayer.DevComputerMovementMode = Enum.DevComputerMovementMode.UserChoice
+	LocalPlayer.DevTouchMovementMode = Enum.DevTouchMovementMode.UserChoice
+end)
+
+local oldModel = Workspace:FindFirstChild("MouseFollowerDodecagon")
+if oldModel then oldModel:Destroy() end
+local oldClone = Workspace:FindFirstChild("DodecagonClone")
+if oldClone then oldClone:Destroy() end
+
+local isFollowerVisible = false
+local currentClone = nil
+local isPathfinding = false
+local touchConnection = nil
+
+local activeTouches = {}
+local touchStartPositions = {}
+
+local dodecagonModel = Instance.new("Model")
+dodecagonModel.Name = "MouseFollowerDodecagon"
+dodecagonModel.Parent = Workspace
+
+local cylinderPart = Instance.new("Part")
+cylinderPart.Name = "Hitbox"
+cylinderPart.Size = Vector3.new(0.5, 2.4, 2.4) 
+cylinderPart.Shape = Enum.PartType.Cylinder
+cylinderPart.Color = Color3.fromRGB(0, 255, 0)
+cylinderPart.Material = Enum.Material.SmoothPlastic
+cylinderPart.CanCollide = false
+cylinderPart.CanTouch = true
+cylinderPart.CanQuery = true
+cylinderPart.Anchored = true
+cylinderPart.CFrame = CFrame.new(0, 0, 0) * CFrame.Angles(0, 0, math.rad(90))
+cylinderPart.Parent = dodecagonModel
+dodecagonModel.PrimaryPart = cylinderPart
+
+local function isHoldingTool()
+	local character = LocalPlayer.Character
+	return character and character:FindFirstChildOfClass("Tool") ~= nil
+end
+
+local function isHoveringInteractivePart(target)
+	if not target then return false end
+	if target == cylinderPart or target:IsDescendantOf(dodecagonModel) or (currentClone and target:IsDescendantOf(currentClone)) then return false end
+	if target:FindFirstChildOfClass("ClickDetector") or target.Parent:FindFirstChildOfClass("ClickDetector") then return true end
+	if target:IsA("Seat") or target:IsA("VehicleSeat") then return true end
+	if target:FindFirstChildOfClass("ProximityPrompt") or target.Parent:FindFirstChildOfClass("ProximityPrompt") then return true end
+	return false
+end
+
+local function isHoveringUIAtPosition(screenPos)
+	if not PlayerGui then return false end
+	local guiObjects = PlayerGui:GetGuiObjectsAtPosition(screenPos.X, screenPos.Y)
+	for _, obj in ipairs(guiObjects) do
+		if obj:IsA("GuiButton") or obj:IsA("TextBox") or obj.Active then
+			return true
+		end
+	end
+	return false
+end
+
+local function removeClone()
+	if touchConnection then
+		touchConnection:Disconnect()
+		touchConnection = nil
+	end
+	if currentClone then
+		currentClone:Destroy()
+		currentClone = nil
+	end
+	isPathfinding = false
+end
+
+-- Check if the camera is zoomed completely into the character's head
+local function isFirstPerson()
+	local character = LocalPlayer.Character
+	local head = character and character:FindFirstChild("Head")
+	if head and Camera then
+		return (Camera.CFrame.Position - head.Position).Magnitude < 1.5
+	end
+	return false
+end
+
+-- Setup character listeners for seat transitions
+local function setupCharacter(character)
+	removeClone()
+	local humanoid = character:WaitForChild("Humanoid", 5)
+	local rootPart = character:WaitForChild("HumanoidRootPart", 5)
+	
+	if humanoid and rootPart then
+		humanoid.Seated:Connect(function(isSitting, seat)
+			if isSitting then
+				removeClone()
+				humanoid:MoveTo(rootPart.Position)
+			end
+		end)
+	end
+end
+
+if LocalPlayer.Character then setupCharacter(LocalPlayer.Character) end
+LocalPlayer.CharacterAdded:Connect(setupCharacter)
+
+local function handlePlacement(targetWorldPos)
+	local character = LocalPlayer.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	
+	-- BLOCK PLACEMENT: Do not allow click destination drop if in first person, moving, or sitting
+	if isFirstPerson() or (humanoid and (humanoid.MoveDirection.Magnitude > 0 or humanoid.Sit)) then 
+		return 
+	end
+
+	removeClone()
+	
+	dodecagonModel.Archivable = true
+	currentClone = dodecagonModel:Clone()
+	currentClone.Name = "DodecagonClone"
+	currentClone:PivotTo(CFrame.new(targetWorldPos) * CFrame.Angles(0, 0, math.rad(90)))
+	
+	local cloneHitbox = currentClone:FindFirstChild("Hitbox")
+	if cloneHitbox then
+		cloneHitbox.CanCollide = false
+		touchConnection = cloneHitbox.Touched:Connect(function(hit)
+			local character = LocalPlayer.Character
+			if character and hit:IsDescendantOf(character) then
+				removeClone()
+			end
+		end)
+	end
+	
+	local cloneCylinder = currentClone:FindFirstChild("Hitbox")
+	if cloneCylinder then
+		cloneCylinder.LocalTransparencyModifier = 0
+	end
+	
+	currentClone.Parent = Workspace
+	isPathfinding = true
+end
+
+-- PC Click Input
+Mouse.Button1Down:Connect(function()
+	if not isFollowerVisible or not dodecagonModel.PrimaryPart then return end
+	handlePlacement(dodecagonModel.PrimaryPart.Position)
+end)
+
+-- Mobile Touch Processing
+UserInputService.TouchStarted:Connect(function(touch, gameProcessedEvent)
+	if gameProcessedEvent then return end
+	activeTouches[touch] = true
+	touchStartPositions[touch] = touch.Position
+end)
+
+UserInputService.TouchEnded:Connect(function(touch, gameProcessedEvent)
+	local startPos = touchStartPositions[touch]
+	activeTouches[touch] = nil
+	touchStartPositions[touch] = nil
+	
+	if gameProcessedEvent then return end
+	
+	local activeCount = 0
+	for _ in pairs(activeTouches) do activeCount = activeCount + 1 end
+	if activeCount > 0 then return end
+	
+	if startPos then
+		local dragDistance = (touch.Position - startPos).Magnitude
+		if dragDistance > 10 then return end
+		
+		local touchPos = Vector2.new(touch.Position.X, touch.Position.Y)
+		if isHoveringUIAtPosition(touchPos) or isHoldingTool() then return end
+		
+		local unitRay = Camera:ScreenPointToRay(touchPos.X, touchPos.Y)
+		local raycastParams = RaycastParams.new()
+		raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+		raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, dodecagonModel}
+		
+		local raycastResult = Workspace:Raycast(unitRay.Origin, unitRay.Direction * 500, raycastParams)
+		
+		if raycastResult and not isHoveringInteractivePart(raycastResult.Instance) then
+			local character = LocalPlayer.Character
+			local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+			
+			if rootPart then
+				local distanceFromPlayer = (rootPart.Position - raycastResult.Position).Magnitude
+				if distanceFromPlayer <= 60 then
+					handlePlacement(raycastResult.Position)
+				end
+			end
+		end
+	end
+end)
+
+-- Frame-by-frame execution loop
+local connection
+connection = RunService.RenderStepped:Connect(function()
+	if not dodecagonModel or not dodecagonModel.Parent then
+		connection:Disconnect()
+		return
+	end
+
+	local character = LocalPlayer.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+
+	-- Basic Movement and Cancel Checking (Active clones will continue moving)
+	if isPathfinding and currentClone and humanoid and rootPart then
+		local horizontalMove = Vector3.new(humanoid.MoveDirection.X, 0, humanoid.MoveDirection.Z)
+		
+		if horizontalMove.Magnitude > 0 then
+			removeClone()
+		else
+			local clonePos = currentClone.PrimaryPart.Position
+			humanoid:MoveTo(clonePos)
+			
+			if (rootPart.Position - clonePos).Magnitude <= 3 then
+				removeClone()
+			end
+		end
+	end
+
+	-- Check if a mouse pointer is being used
+	local hasMouse = UserInputService.MouseEnabled
+	local shouldShow = false
+	
+	-- BLOCK MAIN CYLINDER VISIBILITY: Hide if player is moving, sitting, or in first person mode
+	if hasMouse and humanoid and (humanoid.MoveDirection.Magnitude == 0 and not humanoid.Sit) and not isFirstPerson() then
+		local unitRay = Camera:ScreenPointToRay(Mouse.X, Mouse.Y)
+		local raycastParams = RaycastParams.new()
+		raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+		local ignoreList = {LocalPlayer.Character, dodecagonModel}
+		if currentClone then table.insert(ignoreList, currentClone) end
+		raycastParams.FilterDescendantsInstances = ignoreList
+		
+		local raycastResult = Workspace:Raycast(unitRay.Origin, unitRay.Direction * 500, raycastParams)
+		shouldShow = true
+		
+		if isHoldingTool() or isHoveringUIAtPosition(Vector2.new(Mouse.X, Mouse.Y)) then
+			shouldShow = false
+		end
+		
+		if raycastResult and shouldShow then
+			if rootPart then
+				local distanceFromPlayer = (rootPart.Position - raycastResult.Position).Magnitude
+				if distanceFromPlayer > 60 or isHoveringInteractivePart(raycastResult.Instance) then
+					shouldShow = false
+				else
+					dodecagonModel:PivotTo(CFrame.new(raycastResult.Position) * CFrame.Angles(0, 0, math.rad(90)))
+				end
+			else
+				shouldShow = false
+			end
+		else
+			shouldShow = false
+		end
+	end
+	
+	isFollowerVisible = shouldShow
+	cylinderPart.LocalTransparencyModifier = (hasMouse and shouldShow) and 0 or 1
+end)
+]],
+	Mouse_2008_Aspects = [[ local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local GuiService = game:GetService("GuiService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 5)
+
+-- Clean up any existing custom cursors to avoid duplicates
+if CoreGui:FindFirstChild("Cursor") then 
+	CoreGui.Cursor:Destroy() 
+end
+
+-- State tracking for Roblox Core Esc Menu
+local isEscMenuOpen = false
+
+-- Load and clone the authentic custom GUI cursor asset
+local success, assets = pcall(function()
+	return game:GetObjects("rbxassetid://17895536995")
+end)
+
+if success and assets and assets[1] then
+	local eazywin = assets[1]:Clone()
+	
+	-- Clean up configuration and match requested specifications
+	if eazywin:FindFirstChild("LocalScript") then
+		eazywin.LocalScript:Destroy()
+	end
+	
+	eazywin.DisplayOrder = 1999999999
+	eazywin.IgnoreGuiInset = true
+	eazywin.Y.Value = 6
+	eazywin.Parent = CoreGui
+
+	local imageLabel = eazywin:FindFirstChild("ImageLabel")
+	local actionLabel = imageLabel and imageLabel:FindFirstChild("action")
+	
+	-- Listen to core Esc Menu states to handle automatic hiding
+	GuiService.MenuOpened:Connect(function()
+		isEscMenuOpen = true
+	end)
+
+	GuiService.MenuClosed:Connect(function()
+		isEscMenuOpen = false
+	end)
+	
+	-- Helper function to check if the cursor is hovering over a clickable UI element
+	local function isHoveringClickableUI(mousePos)
+		if not PlayerGui then return false end
+		local guiObjects = PlayerGui:GetGuiObjectsAtPosition(mousePos.X, mousePos.Y)
+		for _, obj in ipairs(guiObjects) do
+			if obj:IsA("GuiButton") or obj:IsA("TextButton") or obj:IsA("ImageButton") then
+				return true
+			end
+		end
+		return false
+	end
+	
+	-- Frame-by-frame execution loop
+	RunService.RenderStepped:Connect(function(step)
+		if not eazywin or not eazywin.Parent then return end
+		
+		local mouse = LocalPlayer:GetMouse()
+		local mousePos = Vector2.new(mouse.X, mouse.Y)
+		
+		-- 3D World Interaction: Hovering over a physical ClickDetector
+		local isHoveringWorldClickable = false
+		if mouse.Target and mouse.Target:FindFirstChildOfClass("ClickDetector") then
+			isHoveringWorldClickable = true
+		end
+		
+		-- 2D Screen Interaction: Hovering over a Clickable UI Button
+		local isHoveringUIButton = isHoveringClickableUI(mousePos)
+		
+		-- Visibility logic switchboards including the Esc Menu check
+		if isEscMenuOpen then
+			-- Context Esc: Menu is open -> Fallback to default Roblox engine pointer, completely hide custom elements
+			UserInputService.MouseIconEnabled = true
+			if imageLabel then imageLabel.Visible = false end
+			if actionLabel then actionLabel.Visible = false end
+			
+		elseif isHoveringWorldClickable then
+			-- Context A: Hovering a 3D ClickDetector -> Default Roblox cursor takes over, hide custom completely
+			UserInputService.MouseIconEnabled = true
+			if imageLabel then imageLabel.Visible = false end
+			
+		elseif isHoveringUIButton then
+			-- Context B: Hovering an interactable UI Button -> Custom cursor stays visible, show the question mark
+			UserInputService.MouseIconEnabled = false
+			if imageLabel then imageLabel.Visible = true end
+			if actionLabel then actionLabel.Visible = true end
+			
+		else
+			-- Context C: Hovering default space -> Custom cursor stays visible, hide the question mark
+			UserInputService.MouseIconEnabled = false
+			if imageLabel then imageLabel.Visible = true end
+			if actionLabel then actionLabel.Visible = false end
+		end
+		
+		-- Smoothly position the custom cursor (shifted down 26 pixels total)
+		if imageLabel and imageLabel.Visible then
+			local targetX = mouse.X - eazywin.X.Value
+			local targetY = mouse.Y - eazywin.Y.Value + 26
+			
+			local tweenInfo = TweenInfo.new(step, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+			local goalProperties = {Position = UDim2.new(0, targetX, 0, targetY)}
+			
+			TweenService:Create(imageLabel, tweenInfo, goalProperties):Play()
+		end
+	end)
+else
+	warn("Failed to get custom cursor asset.")
+end ]],
+	Mouse_2016         = [[ local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local Mouse = LocalPlayer:GetMouse()
+
+-- 1. Create the ScreenGui for the custom cursor
+local CustomCursorGui = Instance.new("ScreenGui")
+CustomCursorGui.Name = "CustomCursorSystem"
+CustomCursorGui.DisplayOrder = 9999999 
+CustomCursorGui.IgnoreGuiInset = true   
+
+-- 2. Create the ImageLabel for the mouse pointer
+local CursorImage = Instance.new("ImageLabel")
+CursorImage.Size = UDim2.new(0, 64, 0, 64) 
+CursorImage.BackgroundTransparency = 1
+CursorImage.ZIndex = 9999999
+CursorImage.Parent = CustomCursorGui
+
+-- Secure positioning inside CoreGui or fallback to PlayerGui
+local success, _ = pcall(function()
+	CustomCursorGui.Parent = game:GetService("CoreGui")
+end)
+if not success then
+	CustomCursorGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+-- 3. Built-in classic image paths
+local DEFAULT_WHITE_CURSOR = "rbxasset://textures/ArrowFarCursor.png"
+local HOVER_BLACK_CURSOR = "rbxasset://textures/ArrowCursor.png"
+
+-- Your perfect alignment offsets
+local WHITE_X_OFFSET = -34
+local WHITE_Y_OFFSET = 28
+
+local BLACK_X_OFFSET = -35
+local BLACK_Y_OFFSET = 30
+
+-- Main Loop running every single frame
+RunService.RenderStepped:Connect(function()
+	local target = Mouse.Target
+	
+	-- Check for 3D interactable parts (ClickDetectors)
+	local hoveringClickDetector = target and (target:FindFirstChildOfClass("ClickDetector") or target.Parent:FindFirstChildOfClass("ClickDetector"))
+	
+	-- Check if hovering 2D UI elements (like inventories or buttons)
+	local engineIsHovering = (UserInputService.OverrideMouseIconBehavior == Enum.OverrideMouseIconBehavior.ForceHide)
+	local hoveringCustomUI = false
+	local guiObjects = LocalPlayer.PlayerGui:GetGuiObjectsAtPosition(Mouse.X, Mouse.Y)
+	for _, obj in ipairs(guiObjects) do
+		if obj:IsA("GuiButton") or (obj:IsA("GuiObject") and obj.Active) then
+			hoveringCustomUI = true
+			break
+		end
+	end
+
+	-- CONDITION UPGRADE: If hovering an interactable 3D part, show default Roblox mouse
+	if hoveringClickDetector then
+		-- Show the original Roblox cursor
+		UserInputService.MouseIconEnabled = true
+		Mouse.Icon = "" -- Clears overrides so default Roblox style shows naturally
+		
+		-- Hide our custom UI cursor
+		CursorImage.Visible = false
+	else
+		-- PERMANENT LOCKDOWN for everywhere else: Hide the hardware mouse
+		if UserInputService.MouseIconEnabled then
+			UserInputService.MouseIconEnabled = false
+		end
+		
+		-- Bring back our custom UI cursor
+		CursorImage.Visible = true
+		
+		-- If hovering 2D UI/Inventory, show the custom black cursor
+		if engineIsHovering or hoveringCustomUI then
+			if CursorImage.Image ~= HOVER_BLACK_CURSOR then
+				CursorImage.Image = HOVER_BLACK_CURSOR
+			end
+			CursorImage.Position = UDim2.new(0, Mouse.X + BLACK_X_OFFSET, 0, Mouse.Y + BLACK_Y_OFFSET)
+		else
+			-- Otherwise, default back to the custom white cursor
+			if CursorImage.Image ~= DEFAULT_WHITE_CURSOR then
+				CursorImage.Image = DEFAULT_WHITE_CURSOR
+			end
+			CursorImage.Position = UDim2.new(0, Mouse.X + WHITE_X_OFFSET, 0, Mouse.Y + WHITE_Y_OFFSET)
+		end
+	end
+end) ]],
+    
+    Textures_2016  = [[ --// Setting up graphics to look older
+local effectsAfter2016 = {"DepthOfFieldEffect", "Atmosphere"}
+local lighting = game:GetService("Lighting")
+
+for _, effect in ipairs(lighting:GetChildren()) do
+    for _, not2016effect in ipairs(effectsAfter2016) do
+        if effect:IsA(not2016effect) then
+            effect:Destroy() 
+        end
+    end
+end
+
+pcall(function()
+    sethiddenproperty(lighting, "Technology", Enum.Technology.Compatibility) 
+end)
+
+lighting.Brightness = 2
+
+--// Configuration for Stud assets
+local STUD_TEXTURE_ID = "rbxassetid://7027211371"
+
+local ALL_SURFACES = {
+    {"TopSurface", Enum.NormalId.Top},
+    {"BottomSurface", Enum.NormalId.Bottom},
+    {"LeftSurface", Enum.NormalId.Left},
+    {"RightSurface", Enum.NormalId.Right},
+    {"FrontSurface", Enum.NormalId.Front},
+    {"BackSurface", Enum.NormalId.Back}
+}
+
+--// Direct application function based strictly on your format
+local function updateClassicStuds(part)
+    if not part:IsA("BasePart") or part.Material ~= Enum.Material.Plastic then return end
+
+    -- Ignore players and NPCs completely
+    if part.Parent:FindFirstChildOfClass("Humanoid") or (part.Parent.Parent and part.Parent.Parent:FindFirstChildOfClass("Humanoid")) then 
+        return 
+    end
+
+    -- Loop through each face independently
+    for _, surfaceData in ipairs(ALL_SURFACES) do
+        local surfaceName = surfaceData[1]
+        local normalId = surfaceData[2]
+
+        -- Check if this specific face has studs
+        local success, surfaceType = pcall(function() return part[surfaceName] end)
+        if success and surfaceType == Enum.SurfaceType.Studs then
+            
+            -- Look specifically for our applied texture on this face
+            local textureName = surfaceName .. "_ClassicTexture"
+            local existingTexture = part:FindFirstChild(textureName)
+            
+            if not existingTexture then
+                local studs = Instance.new("Texture")
+                studs.Name = textureName
+                studs.Face = normalId
+                studs.Texture = STUD_TEXTURE_ID
+                -- RESTORED: Removed math.clamp so it multiplies identically to your snippet
+                studs.Color3 = Color3.new(part.Color.R * 2, part.Color.G * 2, part.Color.B * 2)
+                studs.Transparency = part.Transparency
+                studs.StudsPerTileU = 2
+                studs.StudsPerTileV = 2
+                studs.Parent = part
+            else
+                -- If it exists, just update it seamlessly
+                existingTexture.Color3 = Color3.new(part.Color.R * 2, part.Color.G * 2, part.Color.B * 2)
+                existingTexture.Transparency = part.Transparency
+            end
+        else
+            -- If a studio face no longer has a stud property, remove our texture instantly
+            local existingTexture = part:FindFirstChild(surfaceName .. "_ClassicTexture")
+            if existingTexture then
+                existingTexture:Destroy()
+            end
+        end
+    end
+end
+
+--// Lightweight, centralized property tracker
+local trackedProperties = {
+    Color = true, Transparency = true, Material = true,
+    TopSurface = true, BottomSurface = true, LeftSurface = true, RightSurface = true, FrontSurface = true, BackSurface = true
+}
+
+local function setupTracking(part)
+    if not part:IsA("BasePart") then return end
+    part.Changed:Connect(function(property)
+        if trackedProperties[property] then
+            updateClassicStuds(part)
+        end
+    end)
+end
+
+--// Fast initialization loop
+for _, descendant in ipairs(workspace:GetDescendants()) do
+    if descendant:IsA("BasePart") then
+        updateClassicStuds(descendant)
+        setupTracking(descendant)
+    end
+end
+
+--// Handle freshly spawned objects seamlessly
+workspace.DescendantAdded:Connect(function(descendant)
+    if descendant:IsA("BasePart") then
+        task.defer(function()
+            updateClassicStuds(descendant)
+            setupTracking(descendant)
+        end)
+    end
+end)
+
+task.wait(0.5) ]],
+	
+	-- Mobile Jump Script
+	MobileJump_Old = [[ --OLD JUMP BUTTON
+
+loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-old-roblox-jump-button-texture-242015"))() ]],
+	
+	Forcefield     = [[ -- OLD FORCEFIELD
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local lp = Players.LocalPlayer
+
+local ffFolder = Instance.new("Folder")
+ffFolder.Name = "FFCloneHolder"
+ffFolder.Parent = workspace
+
+local function getTorso(c)
+    return c:FindFirstChild("UpperTorso") or c:FindFirstChild("Torso") or c:FindFirstChild("HumanoidRootPart")
+end
+
+local function buildFF()
+    local model = Instance.new("Model")
+    model.Name = "Forcefield2012"
+    model.Parent = ffFolder
+
+    -- Main Container
+    local main = Instance.new("Part")
+    main.Name = "VisualForcefield2012"
+    main.Anchored = true
+    main.CanCollide = false
+    main.CastShadow = false
+    main.Transparency = 1
+    main.Size = Vector3.new(1,1,1)
+    main.Parent = model
+
+    -- Inner Sphere
+    local mc = Instance.new("Part")
+    mc.Name = "MainCircle"
+    mc.Anchored = true
+    mc.CanCollide = false
+    mc.CastShadow = false
+    mc.Color = Color3.fromRGB(0,0,128)
+    mc.Material = Enum.Material.Neon
+    mc.Transparency = 0.6
+    mc.Size = Vector3.new(0.9,0.9,0.9)
+    mc.Parent = model
+    local mcM = Instance.new("SpecialMesh")
+    mcM.MeshType = Enum.MeshType.Sphere
+    mcM.Scale = Vector3.new(7,7,7)
+    mcM.Parent = mc
+
+    -- Outer Sphere
+    local oc = Instance.new("Part")
+    oc.Name = "OuterCircle"
+    oc.Anchored = true
+    oc.CanCollide = false
+    oc.CastShadow = false
+    oc.Color = Color3.fromRGB(0,0,128)
+    oc.Material = Enum.Material.Neon
+    oc.Transparency = 0.95
+    oc.Size = Vector3.new(0.9,0.9,0.9)
+    oc.Parent = model
+    local ocM = Instance.new("SpecialMesh")
+    ocM.MeshType = Enum.MeshType.Sphere
+    ocM.Scale = Vector3.new(7.7,7.7,7.7)
+    ocM.Parent = oc
+
+    -- Sparkles Part
+    local sp = Instance.new("Part")
+    sp.Name = "Sparkles83"
+    sp.Anchored = true
+    sp.CanCollide = false
+    sp.Transparency = 1
+    sp.Size = Vector3.new(5,1,5)
+    sp.Parent = model
+
+    -- Legacy Particle Style
+    local old = Instance.new("ParticleEmitter")
+    old.Name = "OldSparkles"
+    old.Lifetime = NumberRange.new(3,3)
+    old.LightEmission = 1e9
+    old.LockedToPart = true
+    old.Rate = 7
+    old.RotSpeed = NumberRange.new(25,25)
+    old.Rotation = NumberRange.new(8,8)
+    old.Size = NumberSequence.new(1)
+    old.Speed = NumberRange.new(2,4)
+    old.Texture = "rbxassetid://6334617852"
+    old.Transparency = NumberSequence.new(0.5,1)
+    old.Parent = sp
+
+    -- Glow Rays
+    local rays = Instance.new("ParticleEmitter")
+    rays.Name = "Rays"
+    rays.Lifetime = NumberRange.new(1,1)
+    rays.LightEmission = 1
+    rays.LockedToPart = true
+    rays.Rate = 100
+    rays.RotSpeed = NumberRange.new(-50,50)
+    rays.Rotation = NumberRange.new(-180,180)
+    rays.Size = NumberSequence.new(2)
+    rays.Speed = NumberRange.new(0,0)
+    rays.Texture = "rbxassetid://1084975295"
+    rays.Transparency = NumberSequence.new(0.4,1)
+    rays.Parent = main
+
+    -- Pulsing Animation
+    task.spawn(function()
+        while model.Parent do
+            TweenService:Create(mc, TweenInfo.new(0.55, Enum.EasingStyle.Sine), {Transparency = 0.95}):Play()
+            TweenService:Create(oc, TweenInfo.new(0.7, Enum.EasingStyle.Sine), {Transparency = 0.6}):Play()
+            task.wait(0.55)
+            TweenService:Create(oc, TweenInfo.new(0.5, Enum.EasingStyle.Sine), {Transparency = 0.95}):Play()
+            TweenService:Create(mc, TweenInfo.new(0.5, Enum.EasingStyle.Sine), {Transparency = 0.6}):Play()
+            task.wait(0.35)
+        end
+    end)
+
+    return model
+end
+
+local currentModel = nil
+local char = lp.Character or lp.CharacterAdded:Wait()
+
+-- Core Loop: Watch for Forcefields
+task.spawn(function()
+    while true do
+        local ff = char and char:FindFirstChildOfClass("ForceField")
+        if ff then
+            ff.Visible = false -- Hide the new forcefield
+            if not currentModel then 
+                currentModel = buildFF() 
+            end
+        else
+            if currentModel then
+                currentModel:Destroy()
+                currentModel = nil
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+-- Follow Player
+RunService.PreRender:Connect(function()
+    if not currentModel or not char then return end
+    local t = getTorso(char)
+    if not t then return end
+
+    local targetCF = t.CFrame
+    for _,p in ipairs(currentModel:GetDescendants()) do
+        if p:IsA("BasePart") then
+            p.CFrame = targetCF
+        end
+    end
+end)
+
+lp.CharacterAdded:Connect(function(newChar)
+    char = newChar
+    if currentModel then
+        currentModel:Destroy()
+        currentModel = nil
+    end
+end)
+ ]],
+
+	BetterEmotes   = [[ --EMOTES!
+
+loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-7yd7-I-Emote-Script-48024"))() ]],
+}
+
+-- BUTTON FUNCTIONS ENGINE(DO NOT TOUCH)
+local function RunInvincible(code)
+    if code == "" or code == " " or code == nil then return end
+    task.spawn(function()
+        local func, err = loadstring(code)
+        if func then 
+            local success, runtimeErr = pcall(func)
+            if not success then warn("PARADOX RUNTIME ERROR: " .. tostring(runtimeErr)) end
+        else 
+            warn("PARADOX SYNTAX ERROR: " .. tostring(err)) 
+        end
+    end)
+end
+
+------------------------------------------------------------
+-- SETTINGS
+------------------------------------------------------------
+local CLICK_ID = "rbxassetid://12221967" 
+local HEADER_IMAGE = "rbxthumb://type=Asset&id=131822012703327&w=420&h=420"
+
+local plr = game:GetService("Players").LocalPlayer
+local TweenService = game:GetService("TweenService")
+local pg = plr:WaitForChild("PlayerGui")
+
+local sg = Instance.new("ScreenGui")
+sg.Name = "BloxyParadoxProject"
+sg.ResetOnSpawn = false
+sg.Parent = pg
+
+------------------------------------------------------------
+-- SOUND SETUP
+------------------------------------------------------------
+local sfx = Instance.new("Sound")
+sfx.SoundId = CLICK_ID
+sfx.Volume = 0.6
+sfx.Parent = game:GetService("SoundService")
+
+local function playClick()
+    sfx:Stop() 
+    sfx:Play()
+end
+
+------------------------------------------------------------
+-- UI HELPER FUNCTIONS
+------------------------------------------------------------
+
+local function attachHeaderImage(parentFrame)
+    local img = Instance.new("ImageLabel")
+    img.Name = "HeaderImage"
+    img.BackgroundTransparency = 1
+    img.Image = HEADER_IMAGE
+    img.Size = UDim2.new(0, 260, 0, 160) 
+    img.Position = UDim2.new(0.5, -130, 0, -111) 
+    img.BorderSizePixel = 0
+    img.ZIndex = 10 
+    img.Parent = parentFrame
+    return img
+end
+
+local function createStandardButton(text, pos, width, parent)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, width, 0, 32)
+    btn.Position = pos
+    btn.Text = text
+    btn.Font = Enum.Font.Legacy
+    btn.TextScaled = true 
+    btn.AutoButtonColor = false
+    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    btn.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    btn.ZIndex = 5
+    btn.Parent = parent
+    
+    local constraint = Instance.new("UITextSizeConstraint", btn)
+    constraint.MaxTextSize = 16
+    constraint.MinTextSize = 8
+
+    btn.MouseButton1Click:Connect(function()
+        playClick()
+    end)
+
+    btn.MouseEnter:Connect(function()
+        if btn.Active then
+            btn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.BorderColor3 = Color3.fromRGB(255, 0, 0)
+        end
+    end)
+
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+        btn.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    end)
+
+    return btn
+end
+
+local function createCyanSliderButton(text, pos, width, parent)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, width, 0, 32)
+    btn.Position = pos
+    btn.Text = text
+    btn.Font = Enum.Font.Legacy
+    btn.TextScaled = true 
+    btn.AutoButtonColor = false
+    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    btn.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    btn.ZIndex = 5
+    btn.Parent = parent
+    
+    local constraint = Instance.new("UITextSizeConstraint", btn)
+    constraint.MaxTextSize = 16
+    constraint.MinTextSize = 8
+
+    btn.MouseButton1Click:Connect(function()
+        playClick()
+    end)
+
+    btn.MouseEnter:Connect(function()
+        if btn.Active then
+            btn.BackgroundColor3 = Color3.fromRGB(44, 179, 255) 
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)       
+            btn.BorderColor3 = Color3.fromRGB(0, 0, 0)           
+        end
+    end)
+
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+        btn.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    end)
+
+    return btn
+end
+
+local function genericExit(frame, callback)
+    local t = TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(0.5, frame.Position.X.Offset, 0, -250)})
+    t:Play()
+    t.Completed:Connect(function()
+        frame:Destroy()
+        if callback then 
+            task.spawn(callback) -- Runs next UI in a safe context to prevent yield locks
+        end
+    end)
+end
+
+-- Forward Declaring functions
+local showSafeChatUI, showBackpackUI, showAnimsUI, showSoundsUI, showMouseUI, showTexturesUI, showMobileJumpUI, showForcefieldUI, showEmotesUI
+
+------------------------------------------------------------
+-- ACTION HOOKS
+------------------------------------------------------------
+local OnTopbarSelected = function(choice)
+    if choice == "2023" then RunInvincible(MyScripts.Topbar_2023)
+    elseif choice == "2016_Adv" then RunInvincible(MyScripts.Topbar_2016_A)
+    elseif choice == "2016_Simp" then RunInvincible(MyScripts.Topbar_2016_S)
+    elseif choice == "2015" then RunInvincible(MyScripts.Topbar_2015) 
+    elseif choice == "2014" then RunInvincible(MyScripts.Topbar_2014)
+    elseif choice == "2013" then RunInvincible(MyScripts.Topbar_2013)
+    elseif choice == "2012" then RunInvincible(MyScripts.Topbar_2012)
+    elseif choice == "Old_Chat" then RunInvincible(MyScripts.Topbar_OldChat) end
+end
+
+local OnSafeChatSelected = function(enabled)
+    if enabled then RunInvincible(MyScripts.SafeChat) end
+end
+
+local OnBackpackSelected = function(choice)
+    if choice == "simple" then RunInvincible(MyScripts.Backpack_S)
+    elseif choice == "advanced" then RunInvincible(MyScripts.Backpack_A) end
+end
+
+local OnAnimsSelected = function(choice)
+    if choice == "R6_2008" then RunInvincible(MyScripts.Anims_R6_2008)
+    elseif choice == "R6_2006" then RunInvincible(MyScripts.Anims_R6_2006)
+    elseif choice == "R15_2008" then RunInvincible(MyScripts.Anims_R15_2008)
+    elseif choice == "R15_Old" then RunInvincible(MyScripts.Anims_R15_Old) end
+end
+
+local OnSoundsSelected = function(enabled)
+    if enabled then RunInvincible(MyScripts.OldSounds) end
+end
+
+local OnMouseSelected = function(choice)
+    if choice == "2008_full" then RunInvincible(MyScripts.Mouse_2008_Full)
+    elseif choice == "2008_aspects" then RunInvincible(MyScripts.Mouse_2008_Aspects)
+    elseif choice == "2016" then RunInvincible(MyScripts.Mouse_2016) end
+end
+
+local OnTexturesSelected = function(choice)
+    if choice == "2016" then RunInvincible(MyScripts.Textures_2016) end
+end
+
+local OnMobileJumpSelected = function(enabled)
+    if enabled then RunInvincible(MyScripts.MobileJump_Old) end
+end
+
+local OnForcefieldSelected = function(enabled)
+    if enabled then RunInvincible(MyScripts.Forcefield) end
+end
+
+local OnEmotesSelected = function(enabled)
+    if enabled then RunInvincible(MyScripts.BetterEmotes) end
+end
+
+------------------------------------------------------------
+-- MENU DEFINITIONS
+------------------------------------------------------------
+
+-- 10. EMOTES
+showEmotesUI = function()
+    local f = Instance.new("Frame")
+    f.Size, f.Position, f.BackgroundColor3, f.Parent = UDim2.new(0, 360, 0, 85), UDim2.new(0.5, -180, 0, -250), Color3.new(1,1,1), sg
+    attachHeaderImage(f)
+    local t = Instance.new("TextLabel", f)
+    t.Size, t.BackgroundTransparency, t.Text, t.Font, t.TextSize = UDim2.new(1,0,0,30), 1, "Do you want better emotes?", Enum.Font.Legacy, 14
+    createStandardButton("Yes", UDim2.new(0,15,0,45), 150, f).MouseButton1Click:Connect(function() genericExit(f); OnEmotesSelected(true) end)
+    createStandardButton("No", UDim2.new(1,-165,0,45), 150, f).MouseButton1Click:Connect(function() genericExit(f); OnEmotesSelected(false) end)
+    TweenService:Create(f, TweenInfo.new(0.4), {Position = UDim2.new(0.5, -180, 0.5, -42)}):Play()
+end
+
+-- 9. FORCEFIELD
+showForcefieldUI = function()
+    local f = Instance.new("Frame")
+    f.Size, f.Position, f.BackgroundColor3, f.Parent = UDim2.new(0, 360, 0, 85), UDim2.new(0.5, -180, 0, -250), Color3.new(1,1,1), sg
+    attachHeaderImage(f)
+    local t = Instance.new("TextLabel", f)
+    t.Size, t.BackgroundTransparency, t.Text, t.Font, t.TextSize = UDim2.new(1,0,0,30), 1, "Do you want the old forcefield?", Enum.Font.Legacy, 14
+    createStandardButton("Yes", UDim2.new(0,15,0,45), 160, f).MouseButton1Click:Connect(function() genericExit(f, showEmotesUI); OnForcefieldSelected(true) end)
+    createStandardButton("No", UDim2.new(1,-175,0,45), 160, f).MouseButton1Click:Connect(function() genericExit(f, showEmotesUI); OnForcefieldSelected(false) end)
+    TweenService:Create(f, TweenInfo.new(0.4), {Position = UDim2.new(0.5, -180, 0.5, -42)}):Play()
+end
+
+-- 8. MOBILE JUMP BUTTON
+showMobileJumpUI = function()
+    local f = Instance.new("Frame")
+    f.Size, f.Position, f.BackgroundColor3, f.Parent = UDim2.new(0, 360, 0, 85), UDim2.new(0.5, -180, 0, -250), Color3.new(1,1,1), sg
+    attachHeaderImage(f)
+    local t = Instance.new("TextLabel", f)
+    t.Size, t.BackgroundTransparency, t.Text, t.Font, t.TextSize = UDim2.new(1,0,0,30), 1, "Do you want the old mobile jump button?", Enum.Font.Legacy, 14
+    createStandardButton("Yes", UDim2.new(0,15,0,45), 150, f).MouseButton1Click:Connect(function() genericExit(f, showForcefieldUI); OnMobileJumpSelected(true) end)
+    createStandardButton("No", UDim2.new(1,-165,0,45), 150, f).MouseButton1Click:Connect(function() genericExit(f, showForcefieldUI); OnMobileJumpSelected(false) end)
+    TweenService:Create(f, TweenInfo.new(0.4), {Position = UDim2.new(0.5, -180, 0.5, -42)}):Play()
+end
+
+-- 7. TEXTURES
+showTexturesUI = function()
+    local f = Instance.new("Frame")
+    f.Size, f.Position, f.BackgroundColor3, f.Parent = UDim2.new(0, 360, 0, 95), UDim2.new(0.5, -180, 0, -250), Color3.new(1,1,1), sg
+    attachHeaderImage(f)
+    local t = Instance.new("TextLabel", f)
+    t.Size, t.BackgroundTransparency, t.Text, t.Font, t.TextSize = UDim2.new(1,0,0,35), 1, "What textures do you want to use?", Enum.Font.Legacy, 14
+    createStandardButton("2016 textures", UDim2.new(0,15,0,50), 150, f).MouseButton1Click:Connect(function() genericExit(f, showMobileJumpUI); OnTexturesSelected("2016") end)
+    createStandardButton("Normal", UDim2.new(1,-165,0,50), 150, f).MouseButton1Click:Connect(function() genericExit(f, showMobileJumpUI); OnTexturesSelected("normal") end)
+    TweenService:Create(f, TweenInfo.new(0.4), {Position = UDim2.new(0.5, -180, 0.5, -47)}):Play()
+end
+
+-- 6. MOUSE CURSOR
+showMouseUI = function()
+    local f = Instance.new("Frame")
+    f.Size, f.Position, f.BackgroundColor3, f.Parent = UDim2.new(0, 560, 0, 95), UDim2.new(0.5, -280, 0, -250), Color3.new(1,1,1), sg
+    attachHeaderImage(f)
+    local t = Instance.new("TextLabel", f)
+    t.Size, t.BackgroundTransparency, t.Text, t.Font, t.TextSize = UDim2.new(1,0,0,35), 1, "Choose your mouse cursor", Enum.Font.Legacy, 14
+    createStandardButton("full 2008 mouse", UDim2.new(0,15,0,50), 125, f).MouseButton1Click:Connect(function() genericExit(f, showTexturesUI); OnMouseSelected("2008_full") end)
+    createStandardButton("2008 mouse aspects", UDim2.new(0,150,0,50), 155, f).MouseButton1Click:Connect(function() genericExit(f, showTexturesUI); OnMouseSelected("2008_aspects") end)
+    createStandardButton("2016 mouse", UDim2.new(0,315,0,50), 115, f).MouseButton1Click:Connect(function() genericExit(f, showTexturesUI); OnMouseSelected("2016") end)
+    createStandardButton("normal", UDim2.new(0,440,0,50), 105, f).MouseButton1Click:Connect(function() genericExit(f, showTexturesUI); OnMouseSelected("normal") end)
+    TweenService:Create(f, TweenInfo.new(0.4), {Position = UDim2.new(0.5, -280, 0.5, -47)}):Play()
+end
+
+-- 5. OLD SOUNDS
+showSoundsUI = function()
+    local f = Instance.new("Frame")
+    f.Size, f.Position, f.BackgroundColor3, f.Parent = UDim2.new(0, 360, 0, 85), UDim2.new(0.5, -180, 0, -250), Color3.new(1,1,1), sg
+    attachHeaderImage(f)
+    local t = Instance.new("TextLabel", f)
+    t.Size, t.BackgroundTransparency, t.Text, t.Font, t.TextSize = UDim2.new(1,0,0,30), 1, "Do you want old sounds?", Enum.Font.Legacy, 14
+    createStandardButton("Yes", UDim2.new(0,15,0,45), 150, f).MouseButton1Click:Connect(function() genericExit(f, showMouseUI); OnSoundsSelected(true) end)
+    createStandardButton("No", UDim2.new(1,-165,0,45), 150, f).MouseButton1Click:Connect(function() genericExit(f, showMouseUI); OnSoundsSelected(false) end)
+    TweenService:Create(f, TweenInfo.new(0.4), {Position = UDim2.new(0.5, -180, 0.5, -42)}):Play()
+end
+
+-- 4. ANIMATIONS
+showAnimsUI = function()
+    local f = Instance.new("Frame")
+    f.Size, f.Position, f.BackgroundColor3, f.Parent = UDim2.new(0, 480, 0, 95), UDim2.new(0.5, -240, 0, -250), Color3.new(1,1,1), sg
+    attachHeaderImage(f)
+    
+    local t = Instance.new("TextLabel", f)
+    t.Size, t.BackgroundTransparency, t.Font, t.TextSize = UDim2.new(1,0,0,35), 1, Enum.Font.Legacy, 14
+    
+    -- Safe detection without yielding thread freezes
+    local character = plr.Character
+    local hum = character and character:FindFirstChildOfClass("Humanoid")
+    local isR6 = false
+    if hum then
+        isR6 = (hum.RigType == Enum.HumanoidRigType.R6)
+    elseif character and character:FindFirstChild("Torso") then
+        isR6 = true
+    end
+
+    if isR6 then
+        t.Text = "Choose your animations: R6 Mode"
+        createStandardButton("2008 W.I.P", UDim2.new(0,10,0,50), 140, f).MouseButton1Click:Connect(function() genericExit(f, showSoundsUI); OnAnimsSelected("R6_2008") end)
+        createStandardButton("2006 W.I.P", UDim2.new(0,165,0,50), 140, f).MouseButton1Click:Connect(function() genericExit(f, showSoundsUI); OnAnimsSelected("R6_2006") end)
+        createStandardButton("Normal", UDim2.new(0,320,0,50), 140, f).MouseButton1Click:Connect(function() genericExit(f, showSoundsUI); OnAnimsSelected("normal") end)
+    else
+        t.Text = "Choose your animations: R15 Mode"
+        createStandardButton("2008 for R15 W.I.P", UDim2.new(0,10,0,50), 140, f).MouseButton1Click:Connect(function() genericExit(f, showSoundsUI); OnAnimsSelected("R15_2008") end)
+        createStandardButton("Old R15", UDim2.new(0,165,0,50), 140, f).MouseButton1Click:Connect(function() genericExit(f, showSoundsUI); OnAnimsSelected("R15_Old") end)
+        createStandardButton("Normal", UDim2.new(0,320,0,50), 140, f).MouseButton1Click:Connect(function() genericExit(f, showSoundsUI); OnAnimsSelected("normal") end)
+    end
+    TweenService:Create(f, TweenInfo.new(0.4), {Position = UDim2.new(0.5, -240, 0.5, -47)}):Play()
+end
+
+-- 3. BACKPACK
+showBackpackUI = function()
+    local f = Instance.new("Frame")
+    f.Size, f.Position, f.BackgroundColor3, f.Parent = UDim2.new(0, 480, 0, 95), UDim2.new(0.5, -240, 0, -250), Color3.new(1,1,1), sg
+    attachHeaderImage(f)
+    local t = Instance.new("TextLabel", f)
+    t.Size, t.BackgroundTransparency, t.Text, t.Font, t.TextSize = UDim2.new(1,0,0,35), 1, "Do you want a custom backpack?", Enum.Font.Legacy, 14
+    createStandardButton("No", UDim2.new(0,10,0,50), 90, f).MouseButton1Click:Connect(function() genericExit(f, showAnimsUI); OnBackpackSelected("none") end)
+    createStandardButton("Simple 2008 remake", UDim2.new(0,110,0,50), 160, f).MouseButton1Click:Connect(function() genericExit(f, showAnimsUI); OnBackpackSelected("simple") end)
+    createStandardButton("Advanced", UDim2.new(0,285,0,50), 180, f).MouseButton1Click:Connect(function() genericExit(f, showAnimsUI); OnBackpackSelected("advanced") end)
+    TweenService:Create(f, TweenInfo.new(0.4), {Position = UDim2.new(0.5, -240, 0.5, -47)}):Play()
+end
+
+-- 2. SAFE CHAT
+showSafeChatUI = function()
+    local f = Instance.new("Frame")
+    f.Size, f.Position, f.BackgroundColor3, f.Parent = UDim2.new(0, 360, 0, 85), UDim2.new(0.5, -180, 0, -250), Color3.new(1,1,1), sg
+    attachHeaderImage(f)
+    local t = Instance.new("TextLabel", f)
+    t.Size, t.BackgroundTransparency, t.Text, t.Font, t.TextSize = UDim2.new(1,0,0,30), 1, "Do you want the old safe chat?", Enum.Font.Legacy, 14
+    createStandardButton("Yes", UDim2.new(0,15,0,45), 150, f).MouseButton1Click:Connect(function() genericExit(f, showBackpackUI); OnSafeChatSelected(true) end)
+    createStandardButton("No", UDim2.new(1,-165,0,45), 150, f).MouseButton1Click:Connect(function() genericExit(f, showBackpackUI); OnSafeChatSelected(false) end)
+    TweenService:Create(f, TweenInfo.new(0.4), {Position = UDim2.new(0.5, -180, 0.5, -42)}):Play()
+end
+
+-- 1. TOPBAR SELECTION (START)
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 310, 0, 130) 
+mainFrame.Position = UDim2.new(0.5, -155, 0, -250)
+mainFrame.BackgroundColor3 = Color3.new(1, 1, 1)
+mainFrame.ClipsDescendants = false 
+mainFrame.Parent = sg
+attachHeaderImage(mainFrame)
+
+local mainTitle = Instance.new("TextLabel", mainFrame)
+mainTitle.Size = UDim2.new(1, 0, 0, 35)
+mainTitle.BackgroundTransparency = 1
+mainTitle.Text = "Which topbar do you prefer?"
+mainTitle.Font = Enum.Font.Legacy
+mainTitle.TextSize = 14
+
+local currentSelectionId = "none"
+local expanded = false
+
+-- THE DROPDOWN TOGGLE BUTTON
+local dropdownToggle = createCyanSliderButton("none  ▼", UDim2.new(0.5, -67, 0, 42), 135, mainFrame)
+
+-- THE SLIDER CONTAINER
+local slider = Instance.new("ScrollingFrame")
+slider.Size = UDim2.new(0, 135, 0, 120) 
+slider.Position = UDim2.new(0.5, -67, 0, 74)
+slider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+slider.BorderColor3 = Color3.fromRGB(0, 0, 0)
+slider.CanvasSize = UDim2.new(0, 0, 0, 315) 
+slider.ScrollBarThickness = 0 
+slider.Visible = false
+slider.ZIndex = 20 
+slider.Parent = mainFrame
+
+-- WHITE BOX SCROLLBAR BACKGROUND CONSTRAINER
+local scrollTrack = Instance.new("Frame")
+scrollTrack.Size = UDim2.new(0, 10, 0, 120)
+scrollTrack.Position = UDim2.new(0.5, 68, 0, 74)
+scrollTrack.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+scrollTrack.BorderColor3 = Color3.fromRGB(0, 0, 0)
+scrollTrack.BorderSizePixel = 1
+scrollTrack.ClipsDescendants = true 
+scrollTrack.ZIndex = 21
+scrollTrack.Visible = false
+scrollTrack.Parent = mainFrame
+
+-- BROWSER STYLE CUSTOM GRAY SQUARE SCROLLBAR SLIDER HANDLE
+local customScrollBar = Instance.new("Frame")
+customScrollBar.Size = UDim2.new(0, 10, 0, 51) 
+customScrollBar.Position = UDim2.new(0, 0, 0, 0) 
+customScrollBar.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
+customScrollBar.BorderSizePixel = 0 
+customScrollBar.ZIndex = 22
+customScrollBar.Parent = scrollTrack
+
+slider:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+	local maxScroll = slider.CanvasSize.Y.Offset - slider.Size.Y.Offset
+	if maxScroll > 0 then
+		local scrollPercent = math.clamp(slider.CanvasPosition.Y / maxScroll, 0, 1)
+		local trackLength = scrollTrack.Size.Y.Offset - customScrollBar.Size.Y.Offset
+		customScrollBar.Position = UDim2.new(0, 0, 0, scrollPercent * trackLength)
+	end
+end)
+
+-- SLIDER TEXT SHOWN
+local options = {
+    {text = "2023(pc only)",  id = "2023"},
+    {text = "2016(no chat)",  id = "2016_Adv"},
+    {text = "2016",           id = "2016_Simp"},
+    {text = "2015",           id = "2015"},
+    {text = "2014",           id = "2014"},
+    {text = "2013",           id = "2013"},
+    {text = "2012",           id = "2012"},
+    {text = "old chat only",  id = "Old_Chat"},
+    {text = "none",           id = "none"}
+}
+
+for i, opt in ipairs(options) do
+    local optBtn = createCyanSliderButton(opt.text, UDim2.new(0, 0, 0, (i - 1) * 35), 135, slider)
+    optBtn.ZIndex = 21
+    optBtn.MouseButton1Click:Connect(function()
+        currentSelectionId = opt.id
+        dropdownToggle.Text = opt.text .. "  ▼"
+        slider.Visible = false
+        scrollTrack.Visible = false
+        expanded = false
+    end)
+end
+
+dropdownToggle.MouseButton1Click:Connect(function()
+    expanded = not expanded
+    slider.Visible = expanded
+    scrollTrack.Visible = expanded
+    local arrow = expanded and "  ▲" or "  ▼"
+    local baseText = dropdownToggle.Text:sub(1, -5)
+    dropdownToggle.Text = baseText .. arrow
+end)
+
+-- CONFIRM BUTTON
+local confirmBtn = createStandardButton("confirm", UDim2.new(0.5, -67, 0, 80), 135, mainFrame)
+confirmBtn.ZIndex = 5
+confirmBtn.MouseButton1Click:Connect(function()
+    genericExit(mainFrame, showSafeChatUI)
+    if currentSelectionId and currentSelectionId ~= "none" then
+        OnTopbarSelected(currentSelectionId)
+    end
+end)
+
+TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, -155, 0.5, -65)}):Play()
